@@ -4,6 +4,7 @@ import Katedra.Server.dto.AuthLoginRequestDTO;
 import Katedra.Server.dto.AuthRegisterRequestDTO;
 import Katedra.Server.dto.AuthResponseDTO;
 import Katedra.Server.dto.UsuarioDTO;
+import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.UsuarioRepository;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -35,7 +36,7 @@ public class AuthService {
             request.email(),
             passwordEncoder.encode(request.password()),
             request.nombre(),
-            "ROLE_USER"
+            RolUsuario.ROLE_PROFESOR
         );
 
         usuarioRepository.save(usuario);

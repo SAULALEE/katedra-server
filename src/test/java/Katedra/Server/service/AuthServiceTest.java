@@ -3,6 +3,7 @@ package Katedra.Server.service;
 import Katedra.Server.dto.AuthLoginRequestDTO;
 import Katedra.Server.dto.AuthRegisterRequestDTO;
 import Katedra.Server.dto.AuthResponseDTO;
+import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.UsuarioRepository;
 import org.junit.jupiter.api.Test;
@@ -56,7 +57,7 @@ class AuthServiceTest {
         assertThat(response.token()).isEqualTo("mocked_jwt_token");
         assertThat(response.usuario().email()).isEqualTo("test@cueva.com");
         assertThat(response.usuario().nombre()).isEqualTo("Grog");
-        assertThat(response.usuario().rol()).isEqualTo("ROLE_USER");
+        assertThat(response.usuario().rol()).isEqualTo(RolUsuario.ROLE_PROFESOR);
 
         ArgumentCaptor<Usuario> usuarioCaptor = ArgumentCaptor.forClass(Usuario.class);
         verify(usuarioRepository).save(usuarioCaptor.capture());
@@ -69,7 +70,7 @@ class AuthServiceTest {
     void shouldThrowExceptionWhenRegisteringExistingEmail() {
         // Arrange
         AuthRegisterRequestDTO request = new AuthRegisterRequestDTO("test@cueva.com", "fuego123", "Grog");
-        Usuario existingUser = new Usuario("test@cueva.com", "oldpass", "Old Grog", "ROLE_USER");
+        Usuario existingUser = new Usuario("test@cueva.com", "oldpass", "Old Grog", RolUsuario.ROLE_PROFESOR);
         given(usuarioRepository.findByEmail(request.email())).willReturn(Optional.of(existingUser));
 
         // Act & Assert
@@ -84,7 +85,7 @@ class AuthServiceTest {
     void shouldLoginSuccessfullyAndReturnToken() {
         // Arrange
         AuthLoginRequestDTO request = new AuthLoginRequestDTO("test@cueva.com", "fuego123");
-        Usuario usuario = new Usuario("test@cueva.com", "encoded_fuego123", "Grog", "ROLE_USER");
+        Usuario usuario = new Usuario("test@cueva.com", "encoded_fuego123", "Grog", RolUsuario.ROLE_PROFESOR);
         
         given(usuarioRepository.findByEmail(request.email())).willReturn(Optional.of(usuario));
         given(jwtService.generateToken(usuario)).willReturn("mocked_jwt_token");
