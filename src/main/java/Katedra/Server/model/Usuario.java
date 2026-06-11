@@ -25,8 +25,9 @@ public class Usuario {
     @Column(name = "nombre", nullable = false)
     private String nombre;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "rol", nullable = false)
-    private String rol;
+    private RolUsuario rol;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -39,7 +40,7 @@ public class Usuario {
 
     public Usuario() {}
 
-    public Usuario(String email, String password, String nombre, String rol) {
+    public Usuario(String email, String password, String nombre, RolUsuario rol) {
         this.email = email;
         this.password = password;
         this.nombre = nombre;
@@ -53,8 +54,8 @@ public class Usuario {
     public void setPassword(String password) { this.password = password; }
     public String getNombre() { return nombre; }
     public void setNombre(String nombre) { this.nombre = nombre; }
-    public String getRol() { return rol; }
-    public void setRol(String rol) { this.rol = rol; }
+    public RolUsuario getRol() { return rol; }
+    public void setRol(RolUsuario rol) { this.rol = rol; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
