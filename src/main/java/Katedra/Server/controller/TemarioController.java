@@ -15,9 +15,11 @@ import java.util.List;
 public class TemarioController {
 
     private final TemarioService temarioService;
+    private final Katedra.Server.service.ContenidoTemarioService contenidoTemarioService;
 
-    public TemarioController(TemarioService temarioService) {
+    public TemarioController(TemarioService temarioService, Katedra.Server.service.ContenidoTemarioService contenidoTemarioService) {
         this.temarioService = temarioService;
+        this.contenidoTemarioService = contenidoTemarioService;
     }
 
     @PostMapping
@@ -52,5 +54,32 @@ public class TemarioController {
         String userEmail = authentication.getName();
         temarioService.deleteTemario(id, userEmail);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/contenido")
+    public ResponseEntity<Katedra.Server.dto.ContenidoTemarioResponseDTO> getContenidoByTemarioId(
+            @PathVariable String id,
+            Authentication authentication) {
+        String userEmail = authentication.getName();
+        var contenido = contenidoTemarioService.getContenidoByTemarioId(id, userEmail);
+        return ResponseEntity.ok(contenido);
+    }
+
+    @PostMapping("/{id}/generar-material")
+    public ResponseEntity<Katedra.Server.dto.ContenidoTemarioResponseDTO> generarMaterial(
+            @PathVariable String id,
+            Authentication authentication) {
+        String userEmail = authentication.getName();
+        var contenido = contenidoTemarioService.generarMaterial(id, userEmail);
+        return ResponseEntity.ok(contenido);
+    }
+
+    @PostMapping("/generar-material")
+    public ResponseEntity<Katedra.Server.dto.ContenidoTemarioResponseDTO> generarMaterialDesdeCero(
+            @RequestBody Katedra.Server.dto.GenerarMaterialRequestDTO request,
+            Authentication authentication) {
+        String userEmail = authentication.getName();
+        var contenido = contenidoTemarioService.generarMaterialDesdeCero(request, userEmail);
+        return ResponseEntity.ok(contenido);
     }
 }
