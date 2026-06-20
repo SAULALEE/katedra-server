@@ -4,7 +4,7 @@ Este repositorio contiene el backend de **Katedra**, una herramienta de generaci
 
 ---
 
-## 🛠️ Requisitos Previos e Instalación
+## Requisitos Previos e Instalación
 
 Asegúrate de tener instalado lo siguiente en tu máquina local:
 
@@ -90,7 +90,20 @@ El proyecto expone las siguientes tareas de Maven a través del wrapper (`mvnw`)
 
 ---
 
-## 🔒 Gestión de Variables de Entorno
+##  Documentación de API (APIdog / OpenAPI 3.0)
+
+Este backend expone una especificación completa de la API REST bajo el estándar OpenAPI 3.0 en el archivo [openapi.yaml](openapi.yaml) ubicado en la raíz de este proyecto.
+
+Para importar e interactuar con la API en **APIdog**:
+1. Abre **APIdog** y crea o selecciona tu espacio de trabajo.
+2. Haz clic en **Project Settings** (Configuración del proyecto) -> **Import**.
+3. Selecciona la pestaña **OpenAPI / Swagger**.
+4. Sube o arrastra el archivo `openapi.yaml`.
+5. Confirma la importación. APIdog creará automáticamente la colección de peticiones REST, los esquemas de datos (DTOs) y habilitará mocks interactivos para pruebas locales.
+
+---
+
+##  Gestión de Variables de Entorno
 
 * **No crear archivos locales de configuración con credenciales:** El archivo `application.properties` lee directamente del entorno mediante variables como `${DB_URL}` o `${JWT_SECRET}`. Doppler se encarga de inyectar las variables directamente en el proceso de ejecución.
 * **Variables esenciales para desarrollo:**
