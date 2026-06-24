@@ -19,11 +19,18 @@ public class Usuario {
     @Column(name = "email", nullable = false, unique = true)
     private String email;
 
-    @Column(name = "password", nullable = false)
+    @Column(name = "password")
     private String password;
 
     @Column(name = "nombre", nullable = false)
     private String nombre;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "auth_provider", nullable = false)
+    private AuthProvider authProvider = AuthProvider.LOCAL;
+
+    @Column(name = "provider_user_id")
+    private String providerUserId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "rol", nullable = false)
@@ -44,6 +51,7 @@ public class Usuario {
         this.email = email;
         this.password = password;
         this.nombre = nombre;
+        this.authProvider = AuthProvider.LOCAL;
         this.rol = rol;
     }
 
@@ -54,6 +62,10 @@ public class Usuario {
     public void setPassword(String password) { this.password = password; }
     public String getNombre() { return nombre; }
     public void setNombre(String nombre) { this.nombre = nombre; }
+    public AuthProvider getAuthProvider() { return authProvider; }
+    public void setAuthProvider(AuthProvider authProvider) { this.authProvider = authProvider; }
+    public String getProviderUserId() { return providerUserId; }
+    public void setProviderUserId(String providerUserId) { this.providerUserId = providerUserId; }
     public RolUsuario getRol() { return rol; }
     public void setRol(RolUsuario rol) { this.rol = rol; }
     public LocalDateTime getCreatedAt() { return createdAt; }
