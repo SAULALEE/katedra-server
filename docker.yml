@@ -1,0 +1,28 @@
+version: '3.8'
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: katedra_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secure
+      MYSQL_DATABASE: katedra_dev
+      MYSQL_USER: katedra_dev
+      MYSQL_PASSWORD: ppXUPJYE31LGeB4IrsTCDtl/rTZ6CWbhu9n7/j7jZ0s=
+    ports:
+      - "3306:3306"
+    volumes:
+      - katedra_data:/var/lib/mysql
+    networks:
+      - katedra_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  katedra_network:
+    driver: bridge
+
+volumes:
+  katedra_data:
