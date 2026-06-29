@@ -4,6 +4,7 @@ import Katedra.Server.dto.AuthLoginRequestDTO;
 import Katedra.Server.dto.AuthRegisterRequestDTO;
 import Katedra.Server.dto.AuthResponseDTO;
 import Katedra.Server.dto.UsuarioDTO;
+import Katedra.Server.model.AuthProvider;
 import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.UsuarioRepository;
@@ -36,7 +37,7 @@ public class AuthService {
             request.email(),
             passwordEncoder.encode(request.password()),
             request.nombre(),
-            RolUsuario.ROLE_PROFESOR
+            resolveRoleByEmail(request.email())
         );
 
         usuarioRepository.save(usuario);
@@ -45,15 +46,84 @@ public class AuthService {
     }
 
     public AuthResponseDTO login(AuthLoginRequestDTO request) {
+        Usuario usuario = usuarioRepository.findByEmail(request.email())
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (usuario.getPassword() == null || usuario.getAuthProvider() != AuthProvider.LOCAL) {
+            throw new RuntimeException("Esta cuenta usa login social");
+        }
+
         authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(request.email(), request.password())
         );
-
-        Usuario usuario = usuarioRepository.findByEmail(request.email())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         
         String jwtToken = jwtService.generateToken(usuario);
         return new AuthResponseDTO(jwtToken, mapToDTO(usuario));
+    }
+
+    public AuthResponseDTO loginOrRegisterSocial(
+            AuthProvider authProvider,
+            String providerUserId,
+            String email,
+            String nombre
+    ) {
+        if (providerUserId == null || providerUserId.isBlank()) {
+            throw new RuntimeException("No se pudo obtener el identificador del proveedor");
+        }
+        if (email == null || email.isBlank()) {
+            throw new RuntimeException("No se pudo obtener el email del proveedor");
+        }
+
+        Usuario usuario = usuarioRepository.findByAuthProviderAndProviderUserId(authProvider, providerUserId)
+                .orElseGet(() -> usuarioRepository.findByEmail(email)
+                        .map(existingUser -> linkSocialAccount(existingUser, authProvider, providerUserId, nombre))
+                        .orElseGet(() -> createSocialUser(authProvider, providerUserId, email, nombre)));
+
+        String jwtToken = jwtService.generateToken(usuario);
+        return new AuthResponseDTO(jwtToken, mapToDTO(usuario));
+    }
+
+    private Usuario linkSocialAccount(
+            Usuario usuario,
+            AuthProvider authProvider,
+            String providerUserId,
+            String nombre
+    ) {
+        if (usuario.getAuthProvider() == AuthProvider.LOCAL && usuario.getPassword() != null) {
+            throw new RuntimeException("El email ya está registrado con login tradicional");
+        }
+        if (usuario.getAuthProvider() != AuthProvider.LOCAL && usuario.getAuthProvider() != authProvider) {
+            throw new RuntimeException("El email ya está vinculado a otro proveedor");
+        }
+
+        usuario.setAuthProvider(authProvider);
+        usuario.setProviderUserId(providerUserId);
+        if (usuario.getNombre() == null || usuario.getNombre().isBlank()) {
+            usuario.setNombre(nombre);
+        }
+        return usuarioRepository.save(usuario);
+    }
+
+    private Usuario createSocialUser(
+            AuthProvider authProvider,
+            String providerUserId,
+            String email,
+            String nombre
+    ) {
+        Usuario usuario = new Usuario();
+        usuario.setEmail(email);
+        usuario.setPassword(null);
+        usuario.setNombre(nombre != null && !nombre.isBlank() ? nombre : email);
+        usuario.setAuthProvider(authProvider);
+        usuario.setProviderUserId(providerUserId);
+        usuario.setRol(resolveRoleByEmail(email));
+        return usuarioRepository.save(usuario);
+    }
+
+    private RolUsuario resolveRoleByEmail(String email) {
+        return email != null && email.toLowerCase().endsWith("@katedra.com")
+                ? RolUsuario.ROLE_ADMIN
+                : RolUsuario.ROLE_USER;
     }
 
     private UsuarioDTO mapToDTO(Usuario usuario) {
