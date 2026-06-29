@@ -1,6 +1,5 @@
 package Katedra.Server.config;
 
-import Katedra.Server.model.Usuario;
 import Katedra.Server.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -53,11 +52,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
-            
-            Usuario usuario = new Usuario();
-            usuario.setEmail(userDetails.getUsername());
 
-            if (jwtService.isTokenValid(jwt, usuario)) {
+            if (jwtService.isTokenValid(jwt, userEmail)) {
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         userDetails,
                         null,

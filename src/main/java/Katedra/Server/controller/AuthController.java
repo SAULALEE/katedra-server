@@ -4,6 +4,7 @@ import Katedra.Server.dto.AuthLoginRequestDTO;
 import Katedra.Server.dto.AuthRegisterRequestDTO;
 import Katedra.Server.dto.AuthResponseDTO;
 import Katedra.Server.service.AuthService;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -44,5 +45,19 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponseDTO> login(@RequestBody AuthLoginRequestDTO request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    @GetMapping("/google")
+    public ResponseEntity<Void> googleLogin() {
+        return ResponseEntity.status(302)
+                .header(HttpHeaders.LOCATION, "/api/v1/oauth2/authorization/google")
+                .build();
+    }
+
+    @GetMapping("/microsoft")
+    public ResponseEntity<Void> microsoftLogin() {
+        return ResponseEntity.status(302)
+                .header(HttpHeaders.LOCATION, "/api/v1/oauth2/authorization/microsoft")
+                .build();
     }
 }
