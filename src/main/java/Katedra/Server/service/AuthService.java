@@ -123,7 +123,7 @@ public class AuthService {
     private RolUsuario resolveRoleByEmail(String email) {
         return email != null && email.toLowerCase().endsWith("@katedra.com")
                 ? RolUsuario.ROLE_ADMIN
-                : RolUsuario.ROLE_USER;
+                : RolUsuario.ROLE_PROFESOR;
     }
 
     private UsuarioDTO mapToDTO(Usuario usuario) {

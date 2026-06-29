@@ -70,7 +70,9 @@ public class UsuarioService {
         if (request.rol() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El rol es obligatorio");
         }
-        if (request.rol() != RolUsuario.ROLE_ADMIN && request.rol() != RolUsuario.ROLE_USER) {
+        if (request.rol() != RolUsuario.ROLE_ADMIN 
+                && request.rol() != RolUsuario.ROLE_PROFESOR 
+                && request.rol() != RolUsuario.ROLE_USER) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rol no permitido");
         }
     }
