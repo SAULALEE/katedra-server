@@ -1,8 +1,13 @@
+---
+name: context-server
+description: System context and backend technology stack
+---
+
 # SKILL: SYSTEM CONTEXT & TECHNOLOGY STACK
 
 ## 1. CONTEXT OF ACTIVATION (C_σ)
 - **Trigger:** Whenever a foundational understanding of Katedra's core functionality (AI content generation) or technology stack is required to scope, design, or build new features in the backend.
-- **Exclusion:** Does not handle specific architectural data flows (use `ARCHITECTURE.md`) or database schema details (use `database-jpa-architect.md`).
+- **Exclusion:** Does not handle specific architectural data flows (use `architecture.md`) or database schema details (use `database-jpa-architect.md`).
 
 ## 2. STRICT BUSINESS & TECH RULES (T_σ)
 - **Core App Functionality:** Katedra is an **AI-driven academic content generator**. Its primary engine takes a structured syllabus and automatically creates complete educational materials (theory, practical exercises, evaluations, and presentation slides) using LLMs. 

@@ -1,3 +1,8 @@
+---
+name: decisions-server
+description: Architectural decision records and policy keeper
+---
+
 # SKILL: ARCHITECTURAL DECISION RECORDS (ADR) & POLICY KEEPER
 
 ## 1. CONTEXT OF ACTIVATION (C_σ)

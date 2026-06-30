@@ -1,8 +1,13 @@
+---
+name: database-jpa-architect
+description: Database architecture, JPA mapping rules, and Flyway migrations
+---
+
 # SKILL: Database Architecture, JPA, & Flyway (Katedra Core)
 
 ## 1. CONTEXT OF ACTIVATION (C_σ)
 - **Trigger:** Creating or modifying database schemas, writing Spring Boot JPA entities, creating repositories, or writing Flyway migration scripts.
-- **Exclusion:** Does not handle REST routing (use `ARCHITECTURE.md`).
+- **Exclusion:** Does not handle REST routing (use `architecture.md`).
 
 ## 2. STRICT ARCHITECTURAL RULES (T_σ)
 - **Database Engine:** MySQL 8.0.

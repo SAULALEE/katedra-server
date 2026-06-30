@@ -1,8 +1,13 @@
+---
+name: git-workflow-server
+description: Git and branching workflow for server development
+---
+
 # SKILL: Git Branching Strategy & Workflow
 
 ## 1. CONTEXT OF ACTIVATION (C_σ)
 - **Trigger:** Starting a new coding task, creating branches, making commits, pushing code, or proposing merges/PRs in the server repository.
-- **Exclusion:** Does not govern coding architecture (use `ARCHITECTURE.md`).
+- **Exclusion:** Does not govern coding architecture (use `architecture.md`).
 
 ## 2. STRICT ARCHITECTURAL RULES (T_σ)
 - **Branch Protection & Structure:**

@@ -1,8 +1,13 @@
+---
+name: ai-integration
+description: AI prompt engineering and structured content generation guidelines
+---
+
 # SKILL: AI Integration & Prompt Engineering (Katedra Core)
 
 ## 1. CONTEXT OF ACTIVATION (C_σ)
 - **Trigger:** Defining prompt templates, calling AI provider APIs (Anthropic, OpenAI), parsing structured LLM responses, or modifying services that process generated educational content.
-- **Exclusion:** Does not handle database storage structure (use `database-jpa-architect.md`) or REST routing mechanisms (use `ARCHITECTURE.md`).
+- **Exclusion:** Does not handle database storage structure (use `database-jpa-architect.md`) or REST routing mechanisms (use `architecture.md`).
 
 ## 2. STRICT ARCHITECTURAL RULES (T_σ)
 - **Structured JSON Engine:** AI APIs must return highly structured, valid JSON. Always leverage structured outputs, tool definitions, or strict JSON modes rather than relying on manual regex extraction from raw markdown.

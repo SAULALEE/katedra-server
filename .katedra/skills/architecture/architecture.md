@@ -1,3 +1,8 @@
+---
+name: architecture-server
+description: Backend architecture and modular monolith layered data flow
+---
+
 # SKILL: Backend Architecture & Data Flow (Spring Boot)
 
 ## 1. CONTEXT OF ACTIVATION (C_σ)
