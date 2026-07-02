@@ -10,19 +10,24 @@ description: Architectural decision records and policy keeper
 - **Exclusion:** Does not apply to trivial refactors or business logic details.
 
 ## 2. STRICT ARCHITECTURAL RULES (T_σ)
-- **Authority:** ADRs are the final word. If a proposed change contradicts an established ADR (e.g., ADR-002: Modular Monolith), the agent must halt and flag the conflict.
-- **Core Stack:** Spring Boot 3.x (Java 21), MySQL 8.0, and Flyway. No deviations allowed.
-- **Justification:** Every architectural change must be mapped to a business goal (Scalability, Development Speed, Portfolio Value).
+- **Authority:** ADRs guide decisions but can evolve. Proposed changes must be justified against business goals (Scalability, Development Speed, Portfolio Value).
+- **Core Stack:** 
+  - **Spring Boot 3.x (Java 21) with Spring AI** - Backend API, AI orchestration, data persistence
+  - **MySQL 8.0, Flyway** - Data persistence
+- **Monolithic Architecture with Integrated AI:** Spring Boot handles all concerns (users, auth, syllabi, AI generation) with Spring AI as the LLM abstraction layer.
+- **Justification:** Spring AI provides async-native LLM integration without service overhead. Eliminates thread-blocking issues and reduces operational complexity (1 service instead of 2).
 
 ## 3. STANDARD OPERATING PROCEDURE (π_σ)
 1. **Consultation:** Search/Read the project context and existing ADRs to identify the constraints of the requested feature.
-2. **Alignment:** Validate if the solution aligns with the "Spring Boot + MySQL" stack and "Modular Monolith" pattern.
-3. **Drafting:** Propose the implementation. If it introduces a new technology or structural change, format it as a mini-ADR entry.
-4. **Rejection:** Strictly reject polyglot architectures (e.g., adding NestJS or Node microservices) or microservices overhead for this 1-dev team scope.
+2. **Alignment:** Validate if the solution aligns with the "Spring Boot 3.x + Spring AI + MySQL" stack.
+3. **Implementation Decision:** 
+   - **All features** (users, syllabi, AI generation, persistence) → Spring Boot with Spring AI
+4. **Integration:** Use Spring AI's ChatClient for LLM calls. Always use **async/reactive** patterns (Mono, CompletableFuture) to avoid thread-blocking. Never use synchronous LLM calls.
 
 ## 4. COMPACT RECIPE (FEW-SHOT)
-Input: "Should I use a separate Node.js microservice for the new reporting module?"
+Input: "Should I add a new feature for generating exam questions from syllabi?"
 Output Expected:
-> **Check:** Current architecture is "Monolito modular en Spring Boot" (ADR-002).
-> **Decision:** Rejected. Adding a Node.js microservice creates a polyglot architecture and network overhead, increasing complexity for a 1-dev team.
-> **Proposed Path:** Implement the reporting module as a new package within the existing `katedra-server` Spring Boot project.
+> **Check:** Current architecture is Spring Boot 3.x with Spring AI integrated.
+> **Decision:** Implement in Spring using ChatClient (Spring AI). Use async patterns (Mono or CompletableFuture).
+> **Implementation:** Service calls `chatClient.prompt()` → async LLM call to OpenAI → structured JSON response → save to DB.
+> **Critical:** Never use blocking calls. Always use `@Async`, Mono, or CompletableFuture to avoid thread exhaustion.
