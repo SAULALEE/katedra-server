@@ -7,8 +7,10 @@ import Katedra.Server.model.Temario;
 import Katedra.Server.repository.ContenidoTemarioRepository;
 import Katedra.Server.repository.TemarioRepository;
 import Katedra.Server.repository.UsuarioRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -34,14 +36,14 @@ public class ContenidoTemarioService {
     @Transactional
     public ContenidoTemarioResponseDTO getContenidoByTemarioId(String temarioId, String userEmail) {
         var temario = temarioRepository.findById(temarioId)
-                .orElseThrow(() -> new RuntimeException("Temario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Temario no encontrado"));
 
         if (!temario.getUsuario().getEmail().equals(userEmail)) {
-            throw new RuntimeException("Acceso denegado a este temario");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Acceso denegado a este temario");
         }
 
         ContenidoTemario entity = contenidoTemarioRepository.findByTemarioId(temarioId)
-                .orElseThrow(() -> new RuntimeException("Contenido no generado. Use POST /generar-material"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contenido no generado. Use POST /generar-material"));
 
         return mapToDTO(entity);
     }
@@ -49,10 +51,10 @@ public class ContenidoTemarioService {
     @Transactional
     public CompletableFuture<ContenidoTemarioResponseDTO> generarMaterial(String temarioId, String userEmail) {
         var temario = temarioRepository.findById(temarioId)
-                .orElseThrow(() -> new RuntimeException("Temario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Temario no encontrado"));
 
         if (!temario.getUsuario().getEmail().equals(userEmail)) {
-            throw new RuntimeException("Acceso denegado a este temario");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Acceso denegado a este temario");
         }
 
         return aiContentGeneratorService.generarContenido(
@@ -73,7 +75,7 @@ public class ContenidoTemarioService {
     public CompletableFuture<ContenidoTemarioResponseDTO> generarMaterialDesdeCero(
             GenerarMaterialRequestDTO request, String userEmail) {
         var usuario = usuarioRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
 
         Temario temario = new Temario(usuario, request.tema(), request.unidades(), "Universitario", request.materia());
         var savedTemario = temarioRepository.save(temario);
