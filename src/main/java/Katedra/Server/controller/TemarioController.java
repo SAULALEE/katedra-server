@@ -9,6 +9,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * REST Controller that exposes routes to manage syllabi (temarios)
@@ -91,7 +92,7 @@ public class TemarioController {
 
     /**
      * Retrieves the generated materials (theory, exercises, quizzes, slides) of a syllabus.
-     * If materials do not exist yet, a mockup initial content is generated and saved.
+     * Returns an error if materials have not been generated yet.
      *
      * @param id the unique UUID of the syllabus
      * @param authentication the authenticated user token
@@ -114,12 +115,13 @@ public class TemarioController {
      * @return the newly generated/regenerated materials DTO
      */
     @PostMapping("/{id}/generar-material")
-    public ResponseEntity<Katedra.Server.dto.ContenidoTemarioResponseDTO> generarMaterial(
+    public CompletableFuture<ResponseEntity<Katedra.Server.dto.ContenidoTemarioResponseDTO>> generarMaterial(
             @PathVariable String id,
             Authentication authentication) {
         String userEmail = authentication.getName();
-        var contenido = contenidoTemarioService.generarMaterial(id, userEmail);
-        return ResponseEntity.ok(contenido);
+        return contenidoTemarioService.generarMaterial(id, userEmail)
+                .thenApply(ResponseEntity::ok)
+                .exceptionally(ex -> ResponseEntity.internalServerError().build());
     }
 
     /**
@@ -130,11 +132,12 @@ public class TemarioController {
      * @return the newly generated materials DTO
      */
     @PostMapping("/generar-material")
-    public ResponseEntity<Katedra.Server.dto.ContenidoTemarioResponseDTO> generarMaterialDesdeCero(
+    public CompletableFuture<ResponseEntity<Katedra.Server.dto.ContenidoTemarioResponseDTO>> generarMaterialDesdeCero(
             @RequestBody Katedra.Server.dto.GenerarMaterialRequestDTO request,
             Authentication authentication) {
         String userEmail = authentication.getName();
-        var contenido = contenidoTemarioService.generarMaterialDesdeCero(request, userEmail);
-        return ResponseEntity.ok(contenido);
+        return contenidoTemarioService.generarMaterialDesdeCero(request, userEmail)
+                .thenApply(ResponseEntity::ok)
+                .exceptionally(ex -> ResponseEntity.internalServerError().build());
     }
 }
