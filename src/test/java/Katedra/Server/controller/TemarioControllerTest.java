@@ -13,8 +13,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.security.Principal;
 import java.time.LocalDateTime;
@@ -197,6 +199,26 @@ class TemarioControllerTest {
 
         verify(contenidoTemarioService).generarMaterialDesdeCero(
                 any(Katedra.Server.dto.GenerarMaterialRequestDTO.class), eq("profesor@katedra.com"));
+    }
+
+    @Test
+    void shouldReturn404WhenContenidoNotGenerated() throws Exception {
+        given(contenidoTemarioService.getContenidoByTemarioId("temario-uuid-123", "profesor@katedra.com"))
+                .willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Contenido no generado. Use POST /generar-material"));
+
+        mockMvc.perform(get("/temarios/temario-uuid-123/contenido")
+                        .principal(mockPrincipal))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturn403WhenGenerarMaterialAccessDenied() throws Exception {
+        given(contenidoTemarioService.generarMaterial("temario-uuid-123", "profesor@katedra.com"))
+                .willThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Acceso denegado a este temario"));
+
+        mockMvc.perform(post("/temarios/temario-uuid-123/generar-material")
+                        .principal(mockPrincipal))
+                .andExpect(status().isForbidden());
     }
 
     @Test

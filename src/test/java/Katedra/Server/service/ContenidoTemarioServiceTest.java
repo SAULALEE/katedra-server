@@ -18,7 +18,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
@@ -98,10 +100,11 @@ class ContenidoTemarioServiceTest {
         given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
         given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.empty());
 
-        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
                 contenidoTemarioService.getContenidoByTemarioId("temario-uuid-456", "profesor@katedra.com"));
 
-        assertThat(exception.getMessage()).contains("Contenido no generado");
+        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(exception.getReason()).contains("Contenido no generado");
         verify(contenidoTemarioRepository, never()).save(any(ContenidoTemario.class));
     }
 
@@ -109,20 +112,22 @@ class ContenidoTemarioServiceTest {
     void shouldThrowWhenTemarioNotFound() {
         given(temarioRepository.findById("unknown-id")).willReturn(Optional.empty());
 
-        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
                 contenidoTemarioService.getContenidoByTemarioId("unknown-id", "profesor@katedra.com"));
 
-        assertThat(exception.getMessage()).isEqualTo("Temario no encontrado");
+        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(exception.getReason()).isEqualTo("Temario no encontrado");
     }
 
     @Test
     void shouldThrowWhenAccessDeniedToContenido() {
         given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
 
-        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
                 contenidoTemarioService.getContenidoByTemarioId("temario-uuid-456", "other@katedra.com"));
 
-        assertThat(exception.getMessage()).contains("Acceso denegado");
+        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(exception.getReason()).contains("Acceso denegado");
     }
 
     // --- generarMaterial ---
@@ -153,10 +158,11 @@ class ContenidoTemarioServiceTest {
     void shouldThrowWhenGenerarMaterialAccessDenied() {
         given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
 
-        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
                 contenidoTemarioService.generarMaterial("temario-uuid-456", "other@katedra.com"));
 
-        assertThat(exception.getMessage()).contains("Acceso denegado");
+        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(exception.getReason()).contains("Acceso denegado");
         verify(aiContentGeneratorService, never()).generarContenido(anyString(), anyString(), anyString(), anyString());
     }
 
@@ -212,10 +218,11 @@ class ContenidoTemarioServiceTest {
         GenerarMaterialRequestDTO request = new GenerarMaterialRequestDTO("Programacion", "Grafos", "Unidad 1");
         given(usuarioRepository.findByEmail("unknown@katedra.com")).willReturn(Optional.empty());
 
-        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
                 contenidoTemarioService.generarMaterialDesdeCero(request, "unknown@katedra.com"));
 
-        assertThat(exception.getMessage()).isEqualTo("Usuario no encontrado");
+        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(exception.getReason()).isEqualTo("Usuario no encontrado");
         verify(temarioRepository, never()).save(any(Temario.class));
     }
 }
