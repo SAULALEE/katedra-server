@@ -137,7 +137,8 @@ class TemarioControllerTest {
     @Test
     void shouldGetContenidoByTemarioId() throws Exception {
         var contenidoResponse = new Katedra.Server.dto.ContenidoTemarioResponseDTO(
-                "contenido-uuid-789", "temario-uuid-123", "## Teoría", "## Ejercicios", List.of(), List.of());
+                "contenido-uuid-789", "temario-uuid-123", "## Teoría", "## Ejercicios",
+                List.of(), List.of(), "gpt-4o-mini", List.of());
         given(contenidoTemarioService.getContenidoByTemarioId("temario-uuid-123", "profesor@katedra.com"))
                 .willReturn(contenidoResponse);
 
@@ -145,47 +146,31 @@ class TemarioControllerTest {
                         .principal(mockPrincipal))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("contenido-uuid-789"))
-                .andExpect(jsonPath("$.teoria").value("## Teoría"));
+                .andExpect(jsonPath("$.teoria").value("## Teoría"))
+                .andExpect(jsonPath("$.modelo").value("gpt-4o-mini"));
 
         verify(contenidoTemarioService).getContenidoByTemarioId("temario-uuid-123", "profesor@katedra.com");
     }
 
     @Test
-    void shouldGenerarMaterialAsync() throws Exception {
-        var contenidoResponse = new Katedra.Server.dto.ContenidoTemarioResponseDTO(
-                "contenido-uuid-789", "temario-uuid-123", "## Teoría IA", "## Ejercicios IA", List.of(), List.of());
-        given(contenidoTemarioService.generarMaterial("temario-uuid-123", "profesor@katedra.com"))
-                .willReturn(CompletableFuture.completedFuture(contenidoResponse));
-
-        var mvcResult = mockMvc.perform(post("/temarios/temario-uuid-123/generar-material")
-                        .principal(mockPrincipal))
-                .andExpect(request().asyncStarted())
-                .andReturn();
-
-        mockMvc.perform(asyncDispatch(mvcResult))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("contenido-uuid-789"))
-                .andExpect(jsonPath("$.teoria").value("## Teoría IA"));
-
-        verify(contenidoTemarioService).generarMaterial("temario-uuid-123", "profesor@katedra.com");
-    }
-
-    @Test
-    void shouldGenerarMaterialDesdeCeroAsync() throws Exception {
+    void shouldGenerarMaterialSelectivoAsync() throws Exception {
         String jsonRequest = """
                 {
-                    "materia": "Programacion",
-                    "tema": "Grafos",
-                    "unidades": "Unidad 1: BFS"
+                    "piezas": ["evaluacion"],
+                    "modelo": "gpt-4o-mini"
                 }
                 """;
         var contenidoResponse = new Katedra.Server.dto.ContenidoTemarioResponseDTO(
-                "contenido-nuevo-001", "temario-nuevo-001", "## Teoría IA", "## Ejercicios IA", List.of(), List.of());
-        given(contenidoTemarioService.generarMaterialDesdeCero(
-                any(Katedra.Server.dto.GenerarMaterialRequestDTO.class), eq("profesor@katedra.com")))
+                "contenido-uuid-789", "temario-uuid-123", null, null,
+                List.of(new Katedra.Server.dto.EvaluacionPreguntaDTO(
+                        "¿Pregunta?", List.of("A", "B", "C", "D"), 0, "Explicación")),
+                null, "gpt-4o-mini", List.of());
+        given(contenidoTemarioService.generarMaterial(
+                eq("temario-uuid-123"), eq("profesor@katedra.com"),
+                any(Katedra.Server.dto.GenerarMaterialRequestDTO.class)))
                 .willReturn(CompletableFuture.completedFuture(contenidoResponse));
 
-        var mvcResult = mockMvc.perform(post("/temarios/generar-material")
+        var mvcResult = mockMvc.perform(post("/temarios/temario-uuid-123/generar-material")
                         .principal(mockPrincipal)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequest))
@@ -194,11 +179,71 @@ class TemarioControllerTest {
 
         mockMvc.perform(asyncDispatch(mvcResult))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("contenido-nuevo-001"))
-                .andExpect(jsonPath("$.temarioId").value("temario-nuevo-001"));
+                .andExpect(jsonPath("$.id").value("contenido-uuid-789"))
+                .andExpect(jsonPath("$.evaluacion[0].pregunta").value("¿Pregunta?"))
+                .andExpect(jsonPath("$.modelo").value("gpt-4o-mini"));
 
-        verify(contenidoTemarioService).generarMaterialDesdeCero(
-                any(Katedra.Server.dto.GenerarMaterialRequestDTO.class), eq("profesor@katedra.com"));
+        verify(contenidoTemarioService).generarMaterial(
+                eq("temario-uuid-123"), eq("profesor@katedra.com"),
+                any(Katedra.Server.dto.GenerarMaterialRequestDTO.class));
+    }
+
+    @Test
+    void shouldReportOmittedPiecesInResponse() throws Exception {
+        String jsonRequest = """
+                {
+                    "piezas": ["teoria", "evaluacion"]
+                }
+                """;
+        var contenidoResponse = new Katedra.Server.dto.ContenidoTemarioResponseDTO(
+                "contenido-uuid-789", "temario-uuid-123", "## Teoría IA", null,
+                List.of(), null, "gpt-4o-mini", List.of("evaluacion"));
+        given(contenidoTemarioService.generarMaterial(
+                eq("temario-uuid-123"), eq("profesor@katedra.com"),
+                any(Katedra.Server.dto.GenerarMaterialRequestDTO.class)))
+                .willReturn(CompletableFuture.completedFuture(contenidoResponse));
+
+        var mvcResult = mockMvc.perform(post("/temarios/temario-uuid-123/generar-material")
+                        .principal(mockPrincipal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonRequest))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.piezasOmitidas[0]").value("evaluacion"));
+    }
+
+    @Test
+    void shouldRejectInvalidModelo() throws Exception {
+        String jsonRequest = """
+                {
+                    "piezas": ["teoria"],
+                    "modelo": "gpt-99-turbo-hackeado"
+                }
+                """;
+
+        mockMvc.perform(post("/temarios/temario-uuid-123/generar-material")
+                        .principal(mockPrincipal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonRequest))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldRejectInvalidPieza() throws Exception {
+        String jsonRequest = """
+                {
+                    "piezas": ["memes"]
+                }
+                """;
+
+        mockMvc.perform(post("/temarios/temario-uuid-123/generar-material")
+                        .principal(mockPrincipal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonRequest))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -213,25 +258,20 @@ class TemarioControllerTest {
 
     @Test
     void shouldReturn403WhenGenerarMaterialAccessDenied() throws Exception {
-        given(contenidoTemarioService.generarMaterial("temario-uuid-123", "profesor@katedra.com"))
+        String jsonRequest = """
+                {
+                    "piezas": ["teoria"]
+                }
+                """;
+        given(contenidoTemarioService.generarMaterial(
+                eq("temario-uuid-123"), eq("profesor@katedra.com"),
+                any(Katedra.Server.dto.GenerarMaterialRequestDTO.class)))
                 .willThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Acceso denegado a este temario"));
 
         mockMvc.perform(post("/temarios/temario-uuid-123/generar-material")
-                        .principal(mockPrincipal))
+                        .principal(mockPrincipal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonRequest))
                 .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void shouldReturn500WhenGeneracionFails() throws Exception {
-        given(contenidoTemarioService.generarMaterial("temario-uuid-123", "profesor@katedra.com"))
-                .willReturn(CompletableFuture.failedFuture(new RuntimeException("AI error")));
-
-        var mvcResult = mockMvc.perform(post("/temarios/temario-uuid-123/generar-material")
-                        .principal(mockPrincipal))
-                .andExpect(request().asyncStarted())
-                .andReturn();
-
-        mockMvc.perform(asyncDispatch(mvcResult))
-                .andExpect(status().isInternalServerError());
     }
 }

@@ -1,105 +1,156 @@
 package Katedra.Server.service;
 
 import Katedra.Server.dto.ContenidoTemarioResponseDTO;
+import Katedra.Server.dto.DiapositivaDTO;
+import Katedra.Server.dto.EvaluacionPreguntaDTO;
 import Katedra.Server.dto.GenerarMaterialRequestDTO;
 import Katedra.Server.model.ContenidoTemario;
+import Katedra.Server.model.ModeloIA;
+import Katedra.Server.model.PiezaMaterial;
 import Katedra.Server.model.Temario;
 import Katedra.Server.repository.ContenidoTemarioRepository;
 import Katedra.Server.repository.TemarioRepository;
-import Katedra.Server.repository.UsuarioRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 @Service
 public class ContenidoTemarioService {
 
+    private static final Logger log = LoggerFactory.getLogger(ContenidoTemarioService.class);
+
     private final ContenidoTemarioRepository contenidoTemarioRepository;
     private final TemarioRepository temarioRepository;
-    private final UsuarioRepository usuarioRepository;
     private final AiContentGeneratorService aiContentGeneratorService;
 
     public ContenidoTemarioService(
             ContenidoTemarioRepository contenidoTemarioRepository,
             TemarioRepository temarioRepository,
-            UsuarioRepository usuarioRepository,
             AiContentGeneratorService aiContentGeneratorService) {
         this.contenidoTemarioRepository = contenidoTemarioRepository;
         this.temarioRepository = temarioRepository;
-        this.usuarioRepository = usuarioRepository;
         this.aiContentGeneratorService = aiContentGeneratorService;
     }
 
     @Transactional
     public ContenidoTemarioResponseDTO getContenidoByTemarioId(String temarioId, String userEmail) {
-        var temario = temarioRepository.findById(temarioId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Temario no encontrado"));
-
-        if (!temario.getUsuario().getEmail().equals(userEmail)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Acceso denegado a este temario");
-        }
+        findOwnedTemario(temarioId, userEmail);
 
         ContenidoTemario entity = contenidoTemarioRepository.findByTemarioId(temarioId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contenido no generado. Use POST /generar-material"));
 
-        return mapToDTO(entity);
+        return mapToDTO(entity, List.of());
     }
 
+    /**
+     * Selectively generates the requested pieces. Pieces that already exist are
+     * skipped (reported in {@code piezasOmitidas}) unless explicitly listed in
+     * {@code regenerarPiezas}, so API credits are never spent by accident.
+     */
     @Transactional
-    public CompletableFuture<ContenidoTemarioResponseDTO> generarMaterial(String temarioId, String userEmail) {
-        var temario = temarioRepository.findById(temarioId)
+    public CompletableFuture<ContenidoTemarioResponseDTO> generarMaterial(
+            String temarioId, String userEmail, GenerarMaterialRequestDTO request) {
+
+        Temario temario = findOwnedTemario(temarioId, userEmail);
+
+        if (request == null || request.piezas() == null || request.piezas().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debe seleccionar al menos una pieza a generar");
+        }
+
+        ContenidoTemario contenido = contenidoTemarioRepository.findByTemarioId(temarioId)
+                .orElseGet(() -> new ContenidoTemario(temario));
+
+        String modelo = (request.modelo() != null ? request.modelo() : ModeloIA.SENCILLO).getModelId();
+        Set<PiezaMaterial> forzar = request.regenerarPiezas() == null ? Set.of() : request.regenerarPiezas();
+        // Source text for the prompts; once PDF/web ingestion lands this prefers temario source content.
+        String fuente = temario.getDescripcion();
+
+        Map<PiezaMaterial, CompletableFuture<?>> futures = new EnumMap<>(PiezaMaterial.class);
+        List<String> omitidas = new ArrayList<>();
+
+        for (PiezaMaterial pieza : request.piezas()) {
+            if (existePieza(contenido, pieza) && !forzar.contains(pieza)) {
+                log.info("Pieza '{}' del temario {} ya existe; omitida para ahorrar créditos", pieza.getValor(), temarioId);
+                omitidas.add(pieza.getValor());
+                continue;
+            }
+            futures.put(pieza, dispatch(pieza, temario, fuente, modelo));
+        }
+
+        if (futures.isEmpty()) {
+            return CompletableFuture.completedFuture(mapToDTO(contenido, omitidas));
+        }
+
+        return CompletableFuture.allOf(futures.values().toArray(CompletableFuture[]::new))
+                .thenApply(v -> {
+                    futures.forEach((pieza, future) -> aplicarResultado(contenido, pieza, future.join()));
+                    contenido.setModelo(modelo);
+                    ContenidoTemario saved = contenidoTemarioRepository.save(contenido);
+                    return mapToDTO(saved, omitidas);
+                });
+    }
+
+    private Temario findOwnedTemario(String temarioId, String userEmail) {
+        Temario temario = temarioRepository.findById(temarioId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Temario no encontrado"));
 
         if (!temario.getUsuario().getEmail().equals(userEmail)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Acceso denegado a este temario");
         }
-
-        return aiContentGeneratorService.generarContenido(
-                        temario.getAsignatura(), temario.getTitulo(),
-                        temario.getDescripcion(), temario.getGradoAcademico())
-                .thenApply(aiContenido -> {
-                    ContenidoTemario contenido = contenidoTemarioRepository
-                            .findByTemarioId(temarioId).orElse(new ContenidoTemario(temario));
-                    contenido.setTeoria(aiContenido.teoria());
-                    contenido.setEjercicios(aiContenido.ejercicios());
-                    contenido.setEvaluacion(aiContenido.evaluacion());
-                    contenido.setDiapositivas(aiContenido.diapositivas());
-                    return mapToDTO(contenidoTemarioRepository.save(contenido));
-                });
+        return temario;
     }
 
-    @Transactional
-    public CompletableFuture<ContenidoTemarioResponseDTO> generarMaterialDesdeCero(
-            GenerarMaterialRequestDTO request, String userEmail) {
-        var usuario = usuarioRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
-
-        Temario temario = new Temario(usuario, request.tema(), request.unidades(), "Universitario", request.materia());
-        var savedTemario = temarioRepository.save(temario);
-
-        return aiContentGeneratorService.generarContenido(
-                        request.materia(), request.tema(), request.unidades(), "Universitario")
-                .thenApply(aiContenido -> {
-                    ContenidoTemario contenido = new ContenidoTemario(savedTemario);
-                    contenido.setTeoria(aiContenido.teoria());
-                    contenido.setEjercicios(aiContenido.ejercicios());
-                    contenido.setEvaluacion(aiContenido.evaluacion());
-                    contenido.setDiapositivas(aiContenido.diapositivas());
-                    return mapToDTO(contenidoTemarioRepository.save(contenido));
-                });
+    private boolean existePieza(ContenidoTemario contenido, PiezaMaterial pieza) {
+        return switch (pieza) {
+            case TEORIA -> contenido.getTeoria() != null && !contenido.getTeoria().isBlank();
+            case EJERCICIOS -> contenido.getEjercicios() != null && !contenido.getEjercicios().isBlank();
+            case EVALUACION -> contenido.getEvaluacion() != null && !contenido.getEvaluacion().isEmpty();
+            case DIAPOSITIVAS -> contenido.getDiapositivas() != null && !contenido.getDiapositivas().isEmpty();
+        };
     }
 
-    private ContenidoTemarioResponseDTO mapToDTO(ContenidoTemario entity) {
+    private CompletableFuture<?> dispatch(PiezaMaterial pieza, Temario temario, String fuente, String modelo) {
+        String asignatura = temario.getAsignatura();
+        String titulo = temario.getTitulo();
+        String grado = temario.getGradoAcademico();
+        return switch (pieza) {
+            case TEORIA -> aiContentGeneratorService.generarTeoria(asignatura, titulo, grado, fuente, modelo);
+            case EJERCICIOS -> aiContentGeneratorService.generarEjercicios(asignatura, titulo, grado, fuente, modelo);
+            case EVALUACION -> aiContentGeneratorService.generarEvaluacion(asignatura, titulo, grado, fuente, modelo);
+            case DIAPOSITIVAS -> aiContentGeneratorService.generarDiapositivas(asignatura, titulo, grado, fuente, modelo);
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    private void aplicarResultado(ContenidoTemario contenido, PiezaMaterial pieza, Object resultado) {
+        switch (pieza) {
+            case TEORIA -> contenido.setTeoria((String) resultado);
+            case EJERCICIOS -> contenido.setEjercicios((String) resultado);
+            case EVALUACION -> contenido.setEvaluacion((List<EvaluacionPreguntaDTO>) resultado);
+            case DIAPOSITIVAS -> contenido.setDiapositivas((List<DiapositivaDTO>) resultado);
+        }
+    }
+
+    private ContenidoTemarioResponseDTO mapToDTO(ContenidoTemario entity, List<String> piezasOmitidas) {
         return new ContenidoTemarioResponseDTO(
                 entity.getId(),
                 entity.getTemario().getId(),
                 entity.getTeoria(),
                 entity.getEjercicios(),
                 entity.getEvaluacion(),
-                entity.getDiapositivas()
+                entity.getDiapositivas(),
+                entity.getModelo(),
+                piezasOmitidas
         );
     }
 }

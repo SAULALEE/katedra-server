@@ -1,66 +1,107 @@
 package Katedra.Server.service;
 
 import Katedra.Server.config.PromptTemplates;
-import Katedra.Server.dto.AiContenidoDTO;
-import tools.jackson.databind.ObjectMapper;
+import Katedra.Server.dto.DiapositivaDTO;
+import Katedra.Server.dto.EvaluacionPreguntaDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Per-piece AI generation. Each method is independently async so callers can
+ * generate any subset of the material in parallel, with the model chosen per request.
+ * Structured pieces (evaluacion, diapositivas) use Spring AI structured output
+ * instead of manual JSON parsing.
+ */
 @Service
 public class AiContentGeneratorService {
 
     private static final Logger log = LoggerFactory.getLogger(AiContentGeneratorService.class);
 
     private final ChatClient chatClient;
-    private final ObjectMapper objectMapper;
 
-    public AiContentGeneratorService(ChatClient.Builder chatClientBuilder, ObjectMapper objectMapper) {
+    public AiContentGeneratorService(ChatClient.Builder chatClientBuilder) {
         this.chatClient = chatClientBuilder.build();
-        this.objectMapper = objectMapper;
     }
 
     @Async
-    public CompletableFuture<AiContenidoDTO> generarContenido(
-            String materia, String tema, String unidades, String gradoAcademico) {
+    public CompletableFuture<String> generarTeoria(
+            String asignatura, String titulo, String gradoAcademico, String fuente, String modelo) {
         try {
-            log.info("Generando contenido IA para tema: {}", tema);
-            String userPrompt = PromptTemplates.buildUserPrompt(materia, tema, unidades, gradoAcademico);
-            String jsonResponse = chatClient.prompt()
-                    .system(PromptTemplates.CONTENIDO_TEMARIO_SYSTEM_PROMPT)
-                    .user(userPrompt)
+            log.info("Generando teoría [{}] para tema: {}", modelo, titulo);
+            String texto = chatClient.prompt()
+                    .system(PromptTemplates.TEORIA_SYSTEM_PROMPT)
+                    .user(PromptTemplates.buildUserPrompt(asignatura, titulo, gradoAcademico, fuente))
+                    .options(OpenAiChatOptions.builder().model(modelo))
                     .call()
                     .content();
-
-            AiContenidoDTO contenido = objectMapper.readValue(stripMarkdownFences(jsonResponse), AiContenidoDTO.class);
-            log.info("Contenido generado exitosamente para tema: {}", tema);
-            return CompletableFuture.completedFuture(contenido);
+            return CompletableFuture.completedFuture(texto);
         } catch (Exception ex) {
-            log.error("Error generando contenido IA para tema: {}", tema, ex);
-            return CompletableFuture.completedFuture(new AiContenidoDTO(
-                    "## Error: La generación falló",
-                    "Intenta de nuevo",
-                    List.of(),
-                    List.of()
-            ));
+            log.error("Error generando teoría para tema: {}", titulo, ex);
+            return CompletableFuture.completedFuture(
+                    "## Error: La generación de teoría falló. Intenta de nuevo.");
         }
     }
 
-    // The model may ignore the "no markdown" instruction and wrap the JSON in code fences
-    private String stripMarkdownFences(String response) {
-        if (response == null) {
-            return "";
+    @Async
+    public CompletableFuture<String> generarEjercicios(
+            String asignatura, String titulo, String gradoAcademico, String fuente, String modelo) {
+        try {
+            log.info("Generando ejercicios [{}] para tema: {}", modelo, titulo);
+            String texto = chatClient.prompt()
+                    .system(PromptTemplates.EJERCICIOS_SYSTEM_PROMPT)
+                    .user(PromptTemplates.buildUserPrompt(asignatura, titulo, gradoAcademico, fuente))
+                    .options(OpenAiChatOptions.builder().model(modelo))
+                    .call()
+                    .content();
+            return CompletableFuture.completedFuture(texto);
+        } catch (Exception ex) {
+            log.error("Error generando ejercicios para tema: {}", titulo, ex);
+            return CompletableFuture.completedFuture(
+                    "## Error: La generación de ejercicios falló. Intenta de nuevo.");
         }
-        String cleaned = response.trim();
-        if (cleaned.startsWith("```")) {
-            cleaned = cleaned.replaceFirst("^```(?:json)?\\s*", "");
-            cleaned = cleaned.replaceFirst("\\s*```$", "");
+    }
+
+    @Async
+    public CompletableFuture<List<EvaluacionPreguntaDTO>> generarEvaluacion(
+            String asignatura, String titulo, String gradoAcademico, String fuente, String modelo) {
+        try {
+            log.info("Generando evaluación [{}] para tema: {}", modelo, titulo);
+            List<EvaluacionPreguntaDTO> preguntas = chatClient.prompt()
+                    .system(PromptTemplates.EVALUACION_SYSTEM_PROMPT)
+                    .user(PromptTemplates.buildUserPrompt(asignatura, titulo, gradoAcademico, fuente))
+                    .options(OpenAiChatOptions.builder().model(modelo))
+                    .call()
+                    .entity(new ParameterizedTypeReference<List<EvaluacionPreguntaDTO>>() {});
+            return CompletableFuture.completedFuture(preguntas);
+        } catch (Exception ex) {
+            log.error("Error generando evaluación para tema: {}", titulo, ex);
+            return CompletableFuture.completedFuture(List.of());
         }
-        return cleaned;
+    }
+
+    @Async
+    public CompletableFuture<List<DiapositivaDTO>> generarDiapositivas(
+            String asignatura, String titulo, String gradoAcademico, String fuente, String modelo) {
+        try {
+            log.info("Generando diapositivas [{}] para tema: {}", modelo, titulo);
+            List<DiapositivaDTO> diapositivas = chatClient.prompt()
+                    .system(PromptTemplates.DIAPOSITIVAS_SYSTEM_PROMPT)
+                    .user(PromptTemplates.buildUserPrompt(asignatura, titulo, gradoAcademico, fuente))
+                    .options(OpenAiChatOptions.builder().model(modelo))
+                    .call()
+                    .entity(new ParameterizedTypeReference<List<DiapositivaDTO>>() {});
+            return CompletableFuture.completedFuture(diapositivas);
+        } catch (Exception ex) {
+            log.error("Error generando diapositivas para tema: {}", titulo, ex);
+            return CompletableFuture.completedFuture(List.of());
+        }
     }
 }

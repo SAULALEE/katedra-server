@@ -1,22 +1,28 @@
 package Katedra.Server.service;
 
-import Katedra.Server.dto.AiContenidoDTO;
-import tools.jackson.databind.ObjectMapper;
+import Katedra.Server.dto.DiapositivaDTO;
+import Katedra.Server.dto.EvaluacionPreguntaDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.core.ParameterizedTypeReference;
 
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 
 @ExtendWith(MockitoExtension.class)
 class AiContentGeneratorServiceTest {
+
+    private static final String MODELO = "gpt-4o-mini";
 
     @Mock(answer = RETURNS_DEEP_STUBS)
     private ChatClient chatClient;
@@ -26,80 +32,126 @@ class AiContentGeneratorServiceTest {
 
     private AiContentGeneratorService service;
 
-    private static final String VALID_JSON = """
-            {
-              "teoria": "## Teoría de prueba",
-              "ejercicios": "## Ejercicios de prueba",
-              "evaluacion": [
-                {"pregunta": "¿Qué es una pila?", "opciones": ["A", "B", "C", "D"], "opcionCorrectaIndex": 1, "explicacion": "LIFO"}
-              ],
-              "diapositivas": [
-                {"titulo": "Slide 1", "puntos": ["punto1", "punto2"]}
-              ]
-            }
-            """;
-
     @BeforeEach
     void setUp() {
         given(chatClientBuilder.build()).willReturn(chatClient);
-        service = new AiContentGeneratorService(chatClientBuilder, new ObjectMapper());
+        service = new AiContentGeneratorService(chatClientBuilder);
     }
 
-    private void stubAiResponse(String response) {
+    private void stubContent(String response) {
         given(chatClient.prompt()
-                .system(org.mockito.ArgumentMatchers.anyString())
-                .user(org.mockito.ArgumentMatchers.anyString())
+                .system(anyString())
+                .user(anyString())
+                .options(any())
                 .call()
                 .content()).willReturn(response);
     }
 
-    @Test
-    void shouldParseValidJsonResponse() throws ExecutionException, InterruptedException {
-        stubAiResponse(VALID_JSON);
-
-        AiContenidoDTO result = service.generarContenido("Programacion", "Pilas", "Unidad 1", "Universitario").get();
-
-        assertThat(result.teoria()).isEqualTo("## Teoría de prueba");
-        assertThat(result.ejercicios()).isEqualTo("## Ejercicios de prueba");
-        assertThat(result.evaluacion()).hasSize(1);
-        assertThat(result.evaluacion().getFirst().pregunta()).isEqualTo("¿Qué es una pila?");
-        assertThat(result.evaluacion().getFirst().opcionCorrectaIndex()).isEqualTo(1);
-        assertThat(result.diapositivas()).hasSize(1);
-        assertThat(result.diapositivas().getFirst().puntos()).containsExactly("punto1", "punto2");
-    }
-
-    @Test
-    void shouldParseJsonWrappedInMarkdownFences() throws ExecutionException, InterruptedException {
-        stubAiResponse("```json\n" + VALID_JSON + "\n```");
-
-        AiContenidoDTO result = service.generarContenido("Programacion", "Pilas", "Unidad 1", "Universitario").get();
-
-        assertThat(result.teoria()).isEqualTo("## Teoría de prueba");
-        assertThat(result.evaluacion()).hasSize(1);
-    }
-
-    @Test
-    void shouldReturnFallbackContentWhenResponseIsInvalidJson() throws ExecutionException, InterruptedException {
-        stubAiResponse("esto no es JSON");
-
-        AiContenidoDTO result = service.generarContenido("Programacion", "Pilas", "Unidad 1", "Universitario").get();
-
-        assertThat(result.teoria()).startsWith("## Error");
-        assertThat(result.evaluacion()).isEmpty();
-        assertThat(result.diapositivas()).isEmpty();
-    }
-
-    @Test
-    void shouldReturnFallbackContentWhenAiCallFails() throws ExecutionException, InterruptedException {
+    @SuppressWarnings("unchecked")
+    private <T> void stubEntity(T response) {
         given(chatClient.prompt()
-                .system(org.mockito.ArgumentMatchers.anyString())
-                .user(org.mockito.ArgumentMatchers.anyString())
+                .system(anyString())
+                .user(anyString())
+                .options(any())
                 .call()
-                .content()).willThrow(new RuntimeException("API unavailable"));
+                .entity(any(ParameterizedTypeReference.class))).willReturn(response);
+    }
 
-        AiContenidoDTO result = service.generarContenido("Programacion", "Pilas", "Unidad 1", "Universitario").get();
+    private void stubFailure() {
+        given(chatClient.prompt()
+                .system(anyString())
+                .user(anyString())
+                .options(any())
+                .call()).willThrow(new RuntimeException("API unavailable"));
+    }
 
-        assertThat(result.teoria()).startsWith("## Error");
-        assertThat(result.evaluacion()).isEmpty();
+    // --- teoria ---
+
+    @Test
+    void shouldGenerateTeoriaMarkdown() throws ExecutionException, InterruptedException {
+        stubContent("## Teoría de prueba");
+
+        String result = service.generarTeoria("Programacion", "Pilas", "Universitario", "Pilas y colas", MODELO).get();
+
+        assertThat(result).isEqualTo("## Teoría de prueba");
+    }
+
+    @Test
+    void shouldReturnFallbackTeoriaWhenAiCallFails() throws ExecutionException, InterruptedException {
+        stubFailure();
+
+        String result = service.generarTeoria("Programacion", "Pilas", "Universitario", null, MODELO).get();
+
+        assertThat(result).startsWith("## Error");
+    }
+
+    // --- ejercicios ---
+
+    @Test
+    void shouldGenerateEjerciciosMarkdown() throws ExecutionException, InterruptedException {
+        stubContent("## Ejercicios de prueba");
+
+        String result = service.generarEjercicios("Programacion", "Pilas", "Universitario", "Pilas y colas", MODELO).get();
+
+        assertThat(result).isEqualTo("## Ejercicios de prueba");
+    }
+
+    @Test
+    void shouldReturnFallbackEjerciciosWhenAiCallFails() throws ExecutionException, InterruptedException {
+        stubFailure();
+
+        String result = service.generarEjercicios("Programacion", "Pilas", "Universitario", null, MODELO).get();
+
+        assertThat(result).startsWith("## Error");
+    }
+
+    // --- evaluacion ---
+
+    @Test
+    void shouldGenerateEvaluacionStructured() throws ExecutionException, InterruptedException {
+        List<EvaluacionPreguntaDTO> preguntas = List.of(
+                new EvaluacionPreguntaDTO("¿Qué es una pila?", List.of("A", "B", "C", "D"), 1, "LIFO"));
+        stubEntity(preguntas);
+
+        List<EvaluacionPreguntaDTO> result =
+                service.generarEvaluacion("Programacion", "Pilas", "Universitario", "Pilas y colas", MODELO).get();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().pregunta()).isEqualTo("¿Qué es una pila?");
+        assertThat(result.getFirst().opcionCorrectaIndex()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldReturnEmptyEvaluacionWhenAiCallFails() throws ExecutionException, InterruptedException {
+        stubFailure();
+
+        List<EvaluacionPreguntaDTO> result =
+                service.generarEvaluacion("Programacion", "Pilas", "Universitario", null, MODELO).get();
+
+        assertThat(result).isEmpty();
+    }
+
+    // --- diapositivas ---
+
+    @Test
+    void shouldGenerateDiapositivasStructured() throws ExecutionException, InterruptedException {
+        List<DiapositivaDTO> diapositivas = List.of(new DiapositivaDTO("Slide 1", List.of("punto1", "punto2")));
+        stubEntity(diapositivas);
+
+        List<DiapositivaDTO> result =
+                service.generarDiapositivas("Programacion", "Pilas", "Universitario", "Pilas y colas", MODELO).get();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().puntos()).containsExactly("punto1", "punto2");
+    }
+
+    @Test
+    void shouldReturnEmptyDiapositivasWhenAiCallFails() throws ExecutionException, InterruptedException {
+        stubFailure();
+
+        List<DiapositivaDTO> result =
+                service.generarDiapositivas("Programacion", "Pilas", "Universitario", null, MODELO).get();
+
+        assertThat(result).isEmpty();
     }
 }

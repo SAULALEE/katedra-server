@@ -108,36 +108,22 @@ public class TemarioController {
     }
 
     /**
-     * Forces the regeneration of educational materials for an existing syllabus.
+     * Selectively generates educational material pieces for an existing syllabus.
+     * Pieces that already exist are skipped unless explicitly listed for regeneration,
+     * so OpenAI credits are never spent by accident.
      *
      * @param id the unique UUID of the syllabus
+     * @param request pieces to generate, model tier, and pieces to force-regenerate
      * @param authentication the authenticated user token
-     * @return the newly generated/regenerated materials DTO
+     * @return the updated materials DTO, including any skipped pieces
      */
     @PostMapping("/{id}/generar-material")
     public CompletableFuture<ResponseEntity<Katedra.Server.dto.ContenidoTemarioResponseDTO>> generarMaterial(
             @PathVariable String id,
-            Authentication authentication) {
-        String userEmail = authentication.getName();
-        return contenidoTemarioService.generarMaterial(id, userEmail)
-                .thenApply(ResponseEntity::ok)
-                .exceptionally(ex -> ResponseEntity.internalServerError().build());
-    }
-
-    /**
-     * Instantly creates a new syllabus and generates its educational material from scratch.
-     *
-     * @param request details containing topic, subject, and syllabus units
-     * @param authentication the authenticated user token
-     * @return the newly generated materials DTO
-     */
-    @PostMapping("/generar-material")
-    public CompletableFuture<ResponseEntity<Katedra.Server.dto.ContenidoTemarioResponseDTO>> generarMaterialDesdeCero(
             @RequestBody Katedra.Server.dto.GenerarMaterialRequestDTO request,
             Authentication authentication) {
         String userEmail = authentication.getName();
-        return contenidoTemarioService.generarMaterialDesdeCero(request, userEmail)
-                .thenApply(ResponseEntity::ok)
-                .exceptionally(ex -> ResponseEntity.internalServerError().build());
+        return contenidoTemarioService.generarMaterial(id, userEmail, request)
+                .thenApply(ResponseEntity::ok);
     }
 }
