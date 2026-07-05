@@ -47,6 +47,19 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(request));
     }
 
+    /**
+     * Logs out the current user. JWT auth is stateless, so there is no server-side
+     * session to invalidate; the client discards its token. This endpoint exists so
+     * the frontend logout flow gets a successful acknowledgement (and gives us a
+     * single place to hook token blacklisting later if needed).
+     *
+     * @return HTTP 204 No Content
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout() {
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/google")
     public ResponseEntity<Void> googleLogin() {
         return ResponseEntity.status(302)
