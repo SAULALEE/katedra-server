@@ -89,11 +89,12 @@ public class AiContentGeneratorService {
 
     @Async
     public CompletableFuture<List<DiapositivaDTO>> generarDiapositivas(
-            String asignatura, String titulo, String gradoAcademico, String fuente, String modelo) {
+            String asignatura, String titulo, String gradoAcademico, String fuente, String modelo,
+            int numeroDiapositivas) {
         try {
-            log.info("Generando diapositivas [{}] para tema: {}", modelo, titulo);
+            log.info("Generando {} diapositivas [{}] para tema: {}", numeroDiapositivas, modelo, titulo);
             List<DiapositivaDTO> diapositivas = chatClient.prompt()
-                    .system(PromptTemplates.DIAPOSITIVAS_SYSTEM_PROMPT)
+                    .system(PromptTemplates.buildDiapositivasSystemPrompt(numeroDiapositivas))
                     .user(PromptTemplates.buildUserPrompt(asignatura, titulo, gradoAcademico, fuente))
                     .options(OpenAiChatOptions.builder().model(modelo))
                     .call()
