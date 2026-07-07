@@ -139,7 +139,7 @@ class AiContentGeneratorServiceTest {
         stubEntity(diapositivas);
 
         List<DiapositivaDTO> result =
-                service.generarDiapositivas("Programacion", "Pilas", "Universitario", "Pilas y colas", MODELO).get();
+                service.generarDiapositivas("Programacion", "Pilas", "Universitario", "Pilas y colas", MODELO, 5).get();
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().puntos()).containsExactly("punto1", "punto2");
@@ -150,7 +150,7 @@ class AiContentGeneratorServiceTest {
         stubFailure();
 
         List<DiapositivaDTO> result =
-                service.generarDiapositivas("Programacion", "Pilas", "Universitario", null, MODELO).get();
+                service.generarDiapositivas("Programacion", "Pilas", "Universitario", null, MODELO, 5).get();
 
         assertThat(result).isEmpty();
     }

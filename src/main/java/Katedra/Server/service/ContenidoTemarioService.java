@@ -70,7 +70,9 @@ public class ContenidoTemarioService {
         ContenidoTemario contenido = contenidoTemarioRepository.findByTemarioId(temarioId)
                 .orElseGet(() -> new ContenidoTemario(temario));
 
-        String modelo = (request.modelo() != null ? request.modelo() : ModeloIA.SENCILLO).getModelId();
+        ModeloIA modeloTier = request.modelo() != null ? request.modelo() : ModeloIA.SENCILLO;
+        String modelo = modeloTier.getModelId();
+        int numeroDiapositivas = resolverNumeroDiapositivas(modeloTier, request);
         Set<PiezaMaterial> forzar = request.regenerarPiezas() == null ? Set.of() : request.regenerarPiezas();
         // Source text for the prompts; once PDF/web ingestion lands this prefers temario source content.
         String fuente = temario.getDescripcion();
@@ -84,7 +86,7 @@ public class ContenidoTemarioService {
                 omitidas.add(pieza.getValor());
                 continue;
             }
-            futures.put(pieza, dispatch(pieza, temario, fuente, modelo));
+            futures.put(pieza, dispatch(pieza, temario, fuente, modelo, numeroDiapositivas));
         }
 
         if (futures.isEmpty()) {
@@ -119,7 +121,27 @@ public class ContenidoTemarioService {
         };
     }
 
-    private CompletableFuture<?> dispatch(PiezaMaterial pieza, Temario temario, String fuente, String modelo) {
+    /**
+     * Resolves the slide count against the chosen tier: null falls back to the tier
+     * default; an explicit value is validated against the tier's [min, max] range only
+     * when slides are actually requested, rejecting out-of-range values with 400.
+     */
+    private int resolverNumeroDiapositivas(ModeloIA modeloTier, GenerarMaterialRequestDTO request) {
+        Integer solicitado = request.numeroDiapositivas();
+        if (solicitado == null) {
+            return modeloTier.getDefaultDiapositivas();
+        }
+        if (request.piezas().contains(PiezaMaterial.DIAPOSITIVAS)
+                && (solicitado < modeloTier.getMinDiapositivas() || solicitado > modeloTier.getMaxDiapositivas())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format(
+                    "El número de diapositivas para el modelo %s debe estar entre %d y %d",
+                    modeloTier.name(), modeloTier.getMinDiapositivas(), modeloTier.getMaxDiapositivas()));
+        }
+        return solicitado;
+    }
+
+    private CompletableFuture<?> dispatch(
+            PiezaMaterial pieza, Temario temario, String fuente, String modelo, int numeroDiapositivas) {
         String asignatura = temario.getAsignatura();
         String titulo = temario.getTitulo();
         String grado = temario.getGradoAcademico();
@@ -127,7 +149,7 @@ public class ContenidoTemarioService {
             case TEORIA -> aiContentGeneratorService.generarTeoria(asignatura, titulo, grado, fuente, modelo);
             case EJERCICIOS -> aiContentGeneratorService.generarEjercicios(asignatura, titulo, grado, fuente, modelo);
             case EVALUACION -> aiContentGeneratorService.generarEvaluacion(asignatura, titulo, grado, fuente, modelo);
-            case DIAPOSITIVAS -> aiContentGeneratorService.generarDiapositivas(asignatura, titulo, grado, fuente, modelo);
+            case DIAPOSITIVAS -> aiContentGeneratorService.generarDiapositivas(asignatura, titulo, grado, fuente, modelo, numeroDiapositivas);
         };
     }
 
