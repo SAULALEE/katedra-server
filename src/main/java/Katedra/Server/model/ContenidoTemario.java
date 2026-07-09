@@ -23,12 +23,10 @@ public class ContenidoTemario {
     @JoinColumn(name = "temario_id", nullable = false, unique = true)
     private Temario temario;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "teoria", columnDefinition = "json")
+    @Column(name = "teoria", columnDefinition = "LONGTEXT")
     private String teoria;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "ejercicios", columnDefinition = "json")
+    @Column(name = "ejercicios", columnDefinition = "LONGTEXT")
     private String ejercicios;
 
     @JdbcTypeCode(SqlTypes.JSON)
