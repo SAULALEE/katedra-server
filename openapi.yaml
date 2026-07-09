@@ -318,7 +318,8 @@ components:
           example: Planificación didáctica sobre listas enlazadas, pilas y colas.
         gradoAcademico:
           type: string
-          example: Universidad
+          enum: [primaria, secundaria, bachillerato, universitario, posgrado]
+          example: universitario
         asignatura:
           type: string
           example: Programación I
@@ -338,7 +339,8 @@ components:
           example: Planificación didáctica sobre listas enlazadas, pilas y colas.
         gradoAcademico:
           type: string
-          example: Universidad
+          enum: [primaria, secundaria, bachillerato, universitario, posgrado]
+          example: universitario
         asignatura:
           type: string
           example: Programación I

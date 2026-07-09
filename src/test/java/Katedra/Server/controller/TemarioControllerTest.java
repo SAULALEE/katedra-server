@@ -2,6 +2,7 @@ package Katedra.Server.controller;
 
 import Katedra.Server.dto.TemarioRequestDTO;
 import Katedra.Server.dto.TemarioResponseDTO;
+import Katedra.Server.model.NivelAcademico;
 import Katedra.Server.service.ContenidoTemarioService;
 import Katedra.Server.service.TemarioService;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,7 +64,7 @@ class TemarioControllerTest {
                 "temario-uuid-123",
                 "Curso de Java",
                 "Aprende Java 21",
-                "Universidad",
+                NivelAcademico.UNIVERSITARIO,
                 "Programacion",
                 LocalDateTime.now(),
                 LocalDateTime.now()
@@ -76,7 +77,7 @@ class TemarioControllerTest {
                 {
                     "titulo": "Curso de Java",
                     "descripcion": "Aprende Java 21",
-                    "gradoAcademico": "Universidad",
+                    "gradoAcademico": "universitario",
                     "asignatura": "Programacion"
                 }
                 """;
@@ -138,7 +139,7 @@ class TemarioControllerTest {
     void shouldGetContenidoByTemarioId() throws Exception {
         var contenidoResponse = new Katedra.Server.dto.ContenidoTemarioResponseDTO(
                 "contenido-uuid-789", "temario-uuid-123", "## Teoría", "## Ejercicios",
-                List.of(), List.of(), "gpt-4o-mini", List.of());
+                List.of(), List.of(), "flash", List.of());
         given(contenidoTemarioService.getContenidoByTemarioId("temario-uuid-123", "profesor@katedra.com"))
                 .willReturn(contenidoResponse);
 
@@ -147,7 +148,7 @@ class TemarioControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("contenido-uuid-789"))
                 .andExpect(jsonPath("$.teoria").value("## Teoría"))
-                .andExpect(jsonPath("$.modelo").value("gpt-4o-mini"));
+                .andExpect(jsonPath("$.modelo").value("flash"));
 
         verify(contenidoTemarioService).getContenidoByTemarioId("temario-uuid-123", "profesor@katedra.com");
     }
@@ -157,14 +158,14 @@ class TemarioControllerTest {
         String jsonRequest = """
                 {
                     "piezas": ["evaluacion"],
-                    "modelo": "gpt-4o-mini"
+                    "modelo": "flash"
                 }
                 """;
         var contenidoResponse = new Katedra.Server.dto.ContenidoTemarioResponseDTO(
                 "contenido-uuid-789", "temario-uuid-123", null, null,
                 List.of(new Katedra.Server.dto.EvaluacionPreguntaDTO(
                         "¿Pregunta?", List.of("A", "B", "C", "D"), 0, "Explicación")),
-                null, "gpt-4o-mini", List.of());
+                null, "flash", List.of());
         given(contenidoTemarioService.generarMaterial(
                 eq("temario-uuid-123"), eq("profesor@katedra.com"),
                 any(Katedra.Server.dto.GenerarMaterialRequestDTO.class)))
@@ -181,7 +182,7 @@ class TemarioControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("contenido-uuid-789"))
                 .andExpect(jsonPath("$.evaluacion[0].pregunta").value("¿Pregunta?"))
-                .andExpect(jsonPath("$.modelo").value("gpt-4o-mini"));
+                .andExpect(jsonPath("$.modelo").value("flash"));
 
         verify(contenidoTemarioService).generarMaterial(
                 eq("temario-uuid-123"), eq("profesor@katedra.com"),
@@ -197,7 +198,7 @@ class TemarioControllerTest {
                 """;
         var contenidoResponse = new Katedra.Server.dto.ContenidoTemarioResponseDTO(
                 "contenido-uuid-789", "temario-uuid-123", "## Teoría IA", null,
-                List.of(), null, "gpt-4o-mini", List.of("evaluacion"));
+                List.of(), null, "flash", List.of("evaluacion"));
         given(contenidoTemarioService.generarMaterial(
                 eq("temario-uuid-123"), eq("profesor@katedra.com"),
                 any(Katedra.Server.dto.GenerarMaterialRequestDTO.class)))

@@ -6,6 +6,7 @@ import Katedra.Server.dto.EvaluacionPreguntaDTO;
 import Katedra.Server.dto.GenerarMaterialRequestDTO;
 import Katedra.Server.model.ContenidoTemario;
 import Katedra.Server.model.ModeloIA;
+import Katedra.Server.model.NivelAcademico;
 import Katedra.Server.model.PiezaMaterial;
 import Katedra.Server.model.Temario;
 import Katedra.Server.repository.ContenidoTemarioRepository;
@@ -70,8 +71,7 @@ public class ContenidoTemarioService {
         ContenidoTemario contenido = contenidoTemarioRepository.findByTemarioId(temarioId)
                 .orElseGet(() -> new ContenidoTemario(temario));
 
-        ModeloIA modeloTier = request.modelo() != null ? request.modelo() : ModeloIA.SENCILLO;
-        String modelo = modeloTier.getModelId();
+        ModeloIA modeloTier = request.modelo() != null ? request.modelo() : ModeloIA.FLASH;
         int numeroDiapositivas = resolverNumeroDiapositivas(modeloTier, request);
         Set<PiezaMaterial> forzar = request.regenerarPiezas() == null ? Set.of() : request.regenerarPiezas();
         // Source text for the prompts; once PDF/web ingestion lands this prefers temario source content.
@@ -86,7 +86,7 @@ public class ContenidoTemarioService {
                 omitidas.add(pieza.getValor());
                 continue;
             }
-            futures.put(pieza, dispatch(pieza, temario, fuente, modelo, numeroDiapositivas));
+            futures.put(pieza, dispatch(pieza, temario, fuente, modeloTier, numeroDiapositivas));
         }
 
         if (futures.isEmpty()) {
@@ -96,7 +96,7 @@ public class ContenidoTemarioService {
         return CompletableFuture.allOf(futures.values().toArray(CompletableFuture[]::new))
                 .thenApply(v -> {
                     futures.forEach((pieza, future) -> aplicarResultado(contenido, pieza, future.join()));
-                    contenido.setModelo(modelo);
+                    contenido.setModelo(modeloTier.getValor());
                     ContenidoTemario saved = contenidoTemarioRepository.save(contenido);
                     return mapToDTO(saved, omitidas);
                 });
@@ -141,12 +141,14 @@ public class ContenidoTemarioService {
     }
 
     private CompletableFuture<?> dispatch(
-            PiezaMaterial pieza, Temario temario, String fuente, String modelo, int numeroDiapositivas) {
+            PiezaMaterial pieza, Temario temario, String fuente, ModeloIA modeloTier, int numeroDiapositivas) {
         String asignatura = temario.getAsignatura();
         String titulo = temario.getTitulo();
-        String grado = temario.getGradoAcademico();
+        NivelAcademico nivel = temario.getGradoAcademico();
+        String grado = nivel.getEtiqueta();
+        String modelo = modeloTier.getModelId();
         return switch (pieza) {
-            case TEORIA -> aiContentGeneratorService.generarTeoria(asignatura, titulo, grado, fuente, modelo);
+            case TEORIA -> aiContentGeneratorService.generarTeoria(asignatura, titulo, nivel, fuente, modeloTier);
             case EJERCICIOS -> aiContentGeneratorService.generarEjercicios(asignatura, titulo, grado, fuente, modelo);
             case EVALUACION -> aiContentGeneratorService.generarEvaluacion(asignatura, titulo, grado, fuente, modelo);
             case DIAPOSITIVAS -> aiContentGeneratorService.generarDiapositivas(asignatura, titulo, grado, fuente, modelo, numeroDiapositivas);

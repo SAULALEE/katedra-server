@@ -1,5 +1,7 @@
 package Katedra.Server.config;
 
+import Katedra.Server.model.ModeloIA;
+import Katedra.Server.model.NivelAcademico;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -7,23 +9,39 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PromptTemplatesTest {
 
     @Test
-    void shouldContainRequiredTeoriaSectionsInSystemPrompt() {
-        String prompt = PromptTemplates.TEORIA_SYSTEM_PROMPT;
+    void shouldFollowFlexibleSpineInTeoriaSystemPrompt() {
+        String prompt = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.PRO, NivelAcademico.UNIVERSITARIO);
 
-        assertThat(prompt).contains("## Introducción");
-        assertThat(prompt).contains("## Conceptos clave");
-        assertThat(prompt).contains("## Desarrollo");
-        assertThat(prompt).contains("## Ejemplos aplicados");
-        assertThat(prompt).contains("## Resumen");
+        assertThat(prompt).contains("gancho o contexto");
+        assertThat(prompt).contains("ejemplo resuelto");
+        assertThat(prompt).contains("síntesis");
+        assertThat(prompt).containsIgnoringCase("Katedra");
     }
 
     @Test
-    void shouldAdjustTeoriaDepthByAcademicGrade() {
-        String prompt = PromptTemplates.TEORIA_SYSTEM_PROMPT;
+    void shouldEmbedLevelRubricInTeoriaSystemPrompt() {
+        String primaria = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.FLASH, NivelAcademico.PRIMARIA);
+        String posgrado = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.MAX, NivelAcademico.POSGRADO);
 
-        assertThat(prompt).contains("Nivel escolar");
-        assertThat(prompt).contains("Pregrado");
-        assertThat(prompt).contains("Posgrado");
+        assertThat(primaria).contains(NivelAcademico.PRIMARIA.getRubrica());
+        assertThat(posgrado).contains(NivelAcademico.POSGRADO.getRubrica());
+        assertThat(primaria).isNotEqualTo(posgrado);
+    }
+
+    @Test
+    void shouldEmbedTierParagraphTargetsInTeoriaSystemPrompt() {
+        String flash = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.FLASH, NivelAcademico.UNIVERSITARIO);
+        String max = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.MAX, NivelAcademico.UNIVERSITARIO);
+
+        assertThat(flash).contains(ModeloIA.FLASH.getMinParrafosTeoria() + " y " + ModeloIA.FLASH.getMaxParrafosTeoria());
+        assertThat(max).contains(ModeloIA.MAX.getMinParrafosTeoria() + " y " + ModeloIA.MAX.getMaxParrafosTeoria());
+    }
+
+    @Test
+    void shouldForbidCodeFencesAroundTeoriaContent() {
+        String prompt = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.PRO, NivelAcademico.SECUNDARIA);
+
+        assertThat(prompt).doesNotContain("```");
     }
 
     @Test

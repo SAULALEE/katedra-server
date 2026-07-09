@@ -3,6 +3,8 @@ package Katedra.Server.service;
 import Katedra.Server.config.PromptTemplates;
 import Katedra.Server.dto.DiapositivaDTO;
 import Katedra.Server.dto.EvaluacionPreguntaDTO;
+import Katedra.Server.model.ModeloIA;
+import Katedra.Server.model.NivelAcademico;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -33,13 +35,23 @@ public class AiContentGeneratorService {
 
     @Async
     public CompletableFuture<String> generarTeoria(
-            String asignatura, String titulo, String gradoAcademico, String fuente, String modelo) {
+            String asignatura, String titulo, NivelAcademico nivel, String fuente, ModeloIA modelo) {
         try {
-            log.info("Generando teoría [{}] para tema: {}", modelo, titulo);
+            log.info("Generando teoría [{}] para tema: {} (nivel {})", modelo.getDisplayName(), titulo, nivel.getEtiqueta());
+            OpenAiChatOptions.Builder options = OpenAiChatOptions.builder().model(modelo.getModelId());
+            if (modelo.isReasoning()) {
+                // o-series reasoning models reject `temperature` and use max_completion_tokens
+                // (which also covers hidden reasoning tokens) instead of max_tokens.
+                options.reasoningEffort(modelo.getReasoningEffort())
+                        .maxCompletionTokens(modelo.getMaxTokens());
+            } else {
+                options.temperature(modelo.getTemperature())
+                        .maxTokens(modelo.getMaxTokens());
+            }
             String texto = chatClient.prompt()
-                    .system(PromptTemplates.TEORIA_SYSTEM_PROMPT)
-                    .user(PromptTemplates.buildUserPrompt(asignatura, titulo, gradoAcademico, fuente))
-                    .options(OpenAiChatOptions.builder().model(modelo))
+                    .system(PromptTemplates.buildTeoriaSystemPrompt(modelo, nivel))
+                    .user(PromptTemplates.buildUserPrompt(asignatura, titulo, nivel.getEtiqueta(), fuente))
+                    .options(options)
                     .call()
                     .content();
             return CompletableFuture.completedFuture(texto);
