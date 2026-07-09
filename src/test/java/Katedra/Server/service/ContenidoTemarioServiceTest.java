@@ -6,6 +6,7 @@ import Katedra.Server.dto.EvaluacionPreguntaDTO;
 import Katedra.Server.dto.GenerarMaterialRequestDTO;
 import Katedra.Server.model.ContenidoTemario;
 import Katedra.Server.model.ModeloIA;
+import Katedra.Server.model.NivelAcademico;
 import Katedra.Server.model.PiezaMaterial;
 import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.Temario;
@@ -63,7 +64,7 @@ class ContenidoTemarioServiceTest {
         mockUsuario = new Usuario("profesor@katedra.com", "securepassword", "Saul", RolUsuario.ROLE_PROFESOR);
         ReflectionTestUtils.setField(mockUsuario, "id", "user-uuid-123");
 
-        mockTemario = new Temario(mockUsuario, "Estructuras de Datos", "Pilas y colas", "Universitario", "Programacion");
+        mockTemario = new Temario(mockUsuario, "Estructuras de Datos", "Pilas y colas", NivelAcademico.UNIVERSITARIO, "Programacion");
         mockTemario.setId("temario-uuid-456");
 
         mockEvaluacion = List.of(new EvaluacionPreguntaDTO("¿Pregunta?", List.of("A", "B", "C", "D"), 0, "Explicación"));
@@ -151,7 +152,7 @@ class ContenidoTemarioServiceTest {
 
         assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         verify(aiContentGeneratorService, never())
-                .generarTeoria(anyString(), anyString(), anyString(), anyString(), anyString());
+                .generarTeoria(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class));
     }
 
     @Test
@@ -165,7 +166,7 @@ class ContenidoTemarioServiceTest {
 
         assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         verify(aiContentGeneratorService, never())
-                .generarTeoria(anyString(), anyString(), anyString(), anyString(), anyString());
+                .generarTeoria(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class));
     }
 
     // --- generarMaterial: generación selectiva ---
@@ -179,7 +180,7 @@ class ContenidoTemarioServiceTest {
         stubSaveEchoingWithId();
 
         GenerarMaterialRequestDTO request =
-                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.EVALUACION), ModeloIA.SENCILLO, null, null);
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.EVALUACION), ModeloIA.FLASH, null, null);
 
         ContenidoTemarioResponseDTO response = contenidoTemarioService
                 .generarMaterial("temario-uuid-456", "profesor@katedra.com", request).get();
@@ -188,11 +189,11 @@ class ContenidoTemarioServiceTest {
         assertThat(response.teoria()).isNull();
         assertThat(response.ejercicios()).isNull();
         assertThat(response.diapositivas()).isNull();
-        assertThat(response.modelo()).isEqualTo("gpt-4o-mini");
+        assertThat(response.modelo()).isEqualTo("flash");
         assertThat(response.piezasOmitidas()).isEmpty();
 
         verify(aiContentGeneratorService, never())
-                .generarTeoria(anyString(), anyString(), anyString(), anyString(), anyString());
+                .generarTeoria(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class));
         verify(aiContentGeneratorService, never())
                 .generarEjercicios(anyString(), anyString(), anyString(), anyString(), anyString());
         verify(aiContentGeneratorService, never())
@@ -207,7 +208,7 @@ class ContenidoTemarioServiceTest {
         given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.of(existing));
 
         GenerarMaterialRequestDTO request =
-                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.EVALUACION), ModeloIA.SENCILLO, null, null);
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.EVALUACION), ModeloIA.FLASH, null, null);
 
         ContenidoTemarioResponseDTO response = contenidoTemarioService
                 .generarMaterial("temario-uuid-456", "profesor@katedra.com", request).get();
@@ -230,13 +231,13 @@ class ContenidoTemarioServiceTest {
         stubSaveEchoingWithId();
 
         GenerarMaterialRequestDTO request = new GenerarMaterialRequestDTO(
-                Set.of(PiezaMaterial.EVALUACION), ModeloIA.AVANZADO, Set.of(PiezaMaterial.EVALUACION), null);
+                Set.of(PiezaMaterial.EVALUACION), ModeloIA.MAX, Set.of(PiezaMaterial.EVALUACION), null);
 
         ContenidoTemarioResponseDTO response = contenidoTemarioService
                 .generarMaterial("temario-uuid-456", "profesor@katedra.com", request).get();
 
         assertThat(response.evaluacion()).isEqualTo(mockEvaluacion);
-        assertThat(response.modelo()).isEqualTo("gpt-4o");
+        assertThat(response.modelo()).isEqualTo("max");
         assertThat(response.piezasOmitidas()).isEmpty();
         verify(aiContentGeneratorService)
                 .generarEvaluacion(anyString(), anyString(), anyString(), anyString(), anyString());
@@ -249,12 +250,12 @@ class ContenidoTemarioServiceTest {
         existing.setEvaluacion(mockEvaluacion);
         given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
         given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.of(existing));
-        given(aiContentGeneratorService.generarTeoria(anyString(), anyString(), anyString(), anyString(), anyString()))
+        given(aiContentGeneratorService.generarTeoria(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class)))
                 .willReturn(CompletableFuture.completedFuture("## Teoría generada"));
         stubSaveEchoingWithId();
 
         GenerarMaterialRequestDTO request =
-                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.TEORIA), ModeloIA.SENCILLO, null, null);
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.TEORIA), ModeloIA.FLASH, null, null);
 
         ContenidoTemarioResponseDTO response = contenidoTemarioService
                 .generarMaterial("temario-uuid-456", "profesor@katedra.com", request).get();
@@ -269,7 +270,7 @@ class ContenidoTemarioServiceTest {
     void shouldGenerateAllPiecesInParallel() throws ExecutionException, InterruptedException {
         given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
         given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.empty());
-        given(aiContentGeneratorService.generarTeoria(anyString(), anyString(), anyString(), anyString(), anyString()))
+        given(aiContentGeneratorService.generarTeoria(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class)))
                 .willReturn(CompletableFuture.completedFuture("## Teoría generada"));
         given(aiContentGeneratorService.generarEjercicios(anyString(), anyString(), anyString(), anyString(), anyString()))
                 .willReturn(CompletableFuture.completedFuture("## Ejercicios generados"));
@@ -290,8 +291,8 @@ class ContenidoTemarioServiceTest {
         assertThat(response.ejercicios()).isEqualTo("## Ejercicios generados");
         assertThat(response.evaluacion()).isEqualTo(mockEvaluacion);
         assertThat(response.diapositivas()).isEqualTo(mockDiapositivas);
-        // null modelo defaults to SENCILLO
-        assertThat(response.modelo()).isEqualTo("gpt-4o-mini");
+        // null modelo defaults to FLASH
+        assertThat(response.modelo()).isEqualTo("flash");
     }
 
     // --- generarMaterial: numeroDiapositivas ---
@@ -301,19 +302,19 @@ class ContenidoTemarioServiceTest {
         given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
         given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.empty());
         given(aiContentGeneratorService.generarDiapositivas(
-                anyString(), anyString(), anyString(), anyString(), anyString(), eq(ModeloIA.SENCILLO.getDefaultDiapositivas())))
+                anyString(), anyString(), anyString(), anyString(), anyString(), eq(ModeloIA.FLASH.getDefaultDiapositivas())))
                 .willReturn(CompletableFuture.completedFuture(mockDiapositivas));
         stubSaveEchoingWithId();
 
         GenerarMaterialRequestDTO request =
-                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.DIAPOSITIVAS), ModeloIA.SENCILLO, null, null);
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.DIAPOSITIVAS), ModeloIA.FLASH, null, null);
 
         ContenidoTemarioResponseDTO response = contenidoTemarioService
                 .generarMaterial("temario-uuid-456", "profesor@katedra.com", request).get();
 
         assertThat(response.diapositivas()).isEqualTo(mockDiapositivas);
         verify(aiContentGeneratorService).generarDiapositivas(
-                anyString(), anyString(), anyString(), anyString(), anyString(), eq(ModeloIA.SENCILLO.getDefaultDiapositivas()));
+                anyString(), anyString(), anyString(), anyString(), anyString(), eq(ModeloIA.FLASH.getDefaultDiapositivas()));
     }
 
     @Test
@@ -326,7 +327,7 @@ class ContenidoTemarioServiceTest {
         stubSaveEchoingWithId();
 
         GenerarMaterialRequestDTO request =
-                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.DIAPOSITIVAS), ModeloIA.SENCILLO, null, 6);
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.DIAPOSITIVAS), ModeloIA.FLASH, null, 6);
 
         ContenidoTemarioResponseDTO response = contenidoTemarioService
                 .generarMaterial("temario-uuid-456", "profesor@katedra.com", request).get();
@@ -341,7 +342,7 @@ class ContenidoTemarioServiceTest {
         given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
 
         GenerarMaterialRequestDTO request =
-                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.DIAPOSITIVAS), ModeloIA.SENCILLO, null, 12);
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.DIAPOSITIVAS), ModeloIA.FLASH, null, 12);
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
                 contenidoTemarioService.generarMaterial("temario-uuid-456", "profesor@katedra.com", request));
@@ -352,7 +353,7 @@ class ContenidoTemarioServiceTest {
     }
 
     @Test
-    void shouldAllowNumeroDiapositivasWithinAvanzadoTierRange() throws ExecutionException, InterruptedException {
+    void shouldAllowNumeroDiapositivasWithinMaxTierRange() throws ExecutionException, InterruptedException {
         given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
         given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.empty());
         given(aiContentGeneratorService.generarDiapositivas(
@@ -361,7 +362,7 @@ class ContenidoTemarioServiceTest {
         stubSaveEchoingWithId();
 
         GenerarMaterialRequestDTO request =
-                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.DIAPOSITIVAS), ModeloIA.AVANZADO, null, 12);
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.DIAPOSITIVAS), ModeloIA.MAX, null, 12);
 
         ContenidoTemarioResponseDTO response = contenidoTemarioService
                 .generarMaterial("temario-uuid-456", "profesor@katedra.com", request).get();

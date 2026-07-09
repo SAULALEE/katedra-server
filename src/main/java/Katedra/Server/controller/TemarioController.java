@@ -3,6 +3,7 @@ package Katedra.Server.controller;
 import Katedra.Server.dto.TemarioRequestDTO;
 import Katedra.Server.dto.TemarioResponseDTO;
 import Katedra.Server.service.TemarioService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -37,7 +38,7 @@ public class TemarioController {
      */
     @PostMapping
     public ResponseEntity<TemarioResponseDTO> createTemario(
-            @RequestBody TemarioRequestDTO request,
+            @Valid @RequestBody TemarioRequestDTO request,
             Authentication authentication) {
         String userEmail = authentication.getName();
         TemarioResponseDTO created = temarioService.createTemario(userEmail, request);

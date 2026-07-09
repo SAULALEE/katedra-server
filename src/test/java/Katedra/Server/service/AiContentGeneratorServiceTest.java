@@ -2,6 +2,8 @@ package Katedra.Server.service;
 
 import Katedra.Server.dto.DiapositivaDTO;
 import Katedra.Server.dto.EvaluacionPreguntaDTO;
+import Katedra.Server.model.ModeloIA;
+import Katedra.Server.model.NivelAcademico;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -71,16 +73,28 @@ class AiContentGeneratorServiceTest {
     void shouldGenerateTeoriaMarkdown() throws ExecutionException, InterruptedException {
         stubContent("## Teoría de prueba");
 
-        String result = service.generarTeoria("Programacion", "Pilas", "Universitario", "Pilas y colas", MODELO).get();
+        String result = service.generarTeoria(
+                "Programacion", "Pilas", NivelAcademico.UNIVERSITARIO, "Pilas y colas", ModeloIA.FLASH).get();
 
         assertThat(result).isEqualTo("## Teoría de prueba");
+    }
+
+    @Test
+    void shouldGenerateTeoriaWithReasoningTierWithoutTemperature() throws ExecutionException, InterruptedException {
+        stubContent("## Teoría profunda");
+
+        String result = service.generarTeoria(
+                "Programacion", "Pilas", NivelAcademico.POSGRADO, "Pilas y colas", ModeloIA.MAX).get();
+
+        assertThat(result).isEqualTo("## Teoría profunda");
     }
 
     @Test
     void shouldReturnFallbackTeoriaWhenAiCallFails() throws ExecutionException, InterruptedException {
         stubFailure();
 
-        String result = service.generarTeoria("Programacion", "Pilas", "Universitario", null, MODELO).get();
+        String result = service.generarTeoria(
+                "Programacion", "Pilas", NivelAcademico.UNIVERSITARIO, null, ModeloIA.FLASH).get();
 
         assertThat(result).startsWith("## Error");
     }
