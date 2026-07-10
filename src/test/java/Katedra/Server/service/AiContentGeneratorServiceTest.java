@@ -13,9 +13,11 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.core.ParameterizedTypeReference;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -24,7 +26,7 @@ import static org.mockito.BDDMockito.given;
 @ExtendWith(MockitoExtension.class)
 class AiContentGeneratorServiceTest {
 
-    private static final String MODELO = "gpt-4o-mini";
+    private static final ModeloIA MODELO = ModeloIA.FLASH;
 
     @Mock(answer = RETURNS_DEEP_STUBS)
     private ChatClient chatClient;
@@ -90,13 +92,15 @@ class AiContentGeneratorServiceTest {
     }
 
     @Test
-    void shouldReturnFallbackTeoriaWhenAiCallFails() throws ExecutionException, InterruptedException {
+    void shouldPropagateFailureWhenTeoriaAiCallFails() {
         stubFailure();
 
-        String result = service.generarTeoria(
-                "Programacion", "Pilas", NivelAcademico.UNIVERSITARIO, null, ModeloIA.FLASH).get();
+        CompletableFuture<String> future = service.generarTeoria(
+                "Programacion", "Pilas", NivelAcademico.UNIVERSITARIO, null, ModeloIA.FLASH);
 
-        assertThat(result).startsWith("## Error");
+        assertThatThrownBy(future::get)
+                .hasCauseInstanceOf(RuntimeException.class)
+                .cause().hasMessageContaining("API unavailable");
     }
 
     // --- ejercicios ---
@@ -111,12 +115,15 @@ class AiContentGeneratorServiceTest {
     }
 
     @Test
-    void shouldReturnFallbackEjerciciosWhenAiCallFails() throws ExecutionException, InterruptedException {
+    void shouldPropagateFailureWhenEjerciciosAiCallFails() {
         stubFailure();
 
-        String result = service.generarEjercicios("Programacion", "Pilas", "Universitario", null, MODELO).get();
+        CompletableFuture<String> future =
+                service.generarEjercicios("Programacion", "Pilas", "Universitario", null, MODELO);
 
-        assertThat(result).startsWith("## Error");
+        assertThatThrownBy(future::get)
+                .hasCauseInstanceOf(RuntimeException.class)
+                .cause().hasMessageContaining("API unavailable");
     }
 
     // --- evaluacion ---
@@ -136,13 +143,15 @@ class AiContentGeneratorServiceTest {
     }
 
     @Test
-    void shouldReturnEmptyEvaluacionWhenAiCallFails() throws ExecutionException, InterruptedException {
+    void shouldPropagateFailureWhenEvaluacionAiCallFails() {
         stubFailure();
 
-        List<EvaluacionPreguntaDTO> result =
-                service.generarEvaluacion("Programacion", "Pilas", "Universitario", null, MODELO).get();
+        CompletableFuture<List<EvaluacionPreguntaDTO>> future =
+                service.generarEvaluacion("Programacion", "Pilas", "Universitario", null, MODELO);
 
-        assertThat(result).isEmpty();
+        assertThatThrownBy(future::get)
+                .hasCauseInstanceOf(RuntimeException.class)
+                .cause().hasMessageContaining("API unavailable");
     }
 
     // --- diapositivas ---
@@ -160,12 +169,14 @@ class AiContentGeneratorServiceTest {
     }
 
     @Test
-    void shouldReturnEmptyDiapositivasWhenAiCallFails() throws ExecutionException, InterruptedException {
+    void shouldPropagateFailureWhenDiapositivasAiCallFails() {
         stubFailure();
 
-        List<DiapositivaDTO> result =
-                service.generarDiapositivas("Programacion", "Pilas", "Universitario", null, MODELO, 5).get();
+        CompletableFuture<List<DiapositivaDTO>> future =
+                service.generarDiapositivas("Programacion", "Pilas", "Universitario", null, MODELO, 5);
 
-        assertThat(result).isEmpty();
+        assertThatThrownBy(future::get)
+                .hasCauseInstanceOf(RuntimeException.class)
+                .cause().hasMessageContaining("API unavailable");
     }
 }

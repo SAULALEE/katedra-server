@@ -30,11 +30,29 @@ class PromptTemplatesTest {
 
     @Test
     void shouldEmbedTierParagraphTargetsInTeoriaSystemPrompt() {
+        // All three tiers currently define a real range (min < max): "entre N y M párrafos".
         String flash = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.FLASH, NivelAcademico.UNIVERSITARIO);
+        String pro = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.PRO, NivelAcademico.UNIVERSITARIO);
         String max = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.MAX, NivelAcademico.UNIVERSITARIO);
 
         assertThat(flash).contains(ModeloIA.FLASH.getMinParrafosTeoria() + " y " + ModeloIA.FLASH.getMaxParrafosTeoria());
+        assertThat(pro).contains(ModeloIA.PRO.getMinParrafosTeoria() + " y " + ModeloIA.PRO.getMaxParrafosTeoria());
         assertThat(max).contains(ModeloIA.MAX.getMinParrafosTeoria() + " y " + ModeloIA.MAX.getMaxParrafosTeoria());
+    }
+
+    @Test
+    void shouldEmbedDistinctTierStyleInTeoriaSystemPrompt() {
+        String tutor = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.FLASH, NivelAcademico.UNIVERSITARIO);
+        String maestro = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.PRO, NivelAcademico.UNIVERSITARIO);
+        String catedratico = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.MAX, NivelAcademico.UNIVERSITARIO);
+
+        assertThat(tutor).contains(ModeloIA.FLASH.getEstiloTeoria());
+        assertThat(maestro).contains(ModeloIA.PRO.getEstiloTeoria());
+        assertThat(catedratico).contains(ModeloIA.MAX.getEstiloTeoria());
+        assertThat(tutor).isNotEqualTo(maestro).isNotEqualTo(catedratico);
+
+        // The mandatory intro/development/conclusion structure applies to every tier.
+        assertThat(tutor).contains("INTRODUCCIÓN").contains("DESARROLLO").contains("CONCLUSIÓN");
     }
 
     @Test

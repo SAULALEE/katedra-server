@@ -41,8 +41,24 @@ public final class PromptTemplates {
         return TEORIA_SYSTEM_TEMPLATE.render(Map.of(
                 "katedraContext", KATEDRA_CONTEXT,
                 "nivelRubrica", nivel.getRubrica(),
-                "minParrafos", modelo.getMinParrafosTeoria(),
-                "maxParrafos", modelo.getMaxParrafosTeoria()));
+                "estiloTeoria", modelo.getEstiloTeoria(),
+                "parrafosInstruccion", buildParrafosInstruccion(modelo)));
+    }
+
+    /**
+     * Renders the exact wording for the paragraph-count instruction in Java rather
+     * than in the .st template, since the phrasing branches on whether the tier has
+     * a fixed count (min == max) or a range (e.g. Catedrático's 8-10).
+     */
+    private static String buildParrafosInstruccion(ModeloIA modelo) {
+        int min = modelo.getMinParrafosTeoria();
+        int max = modelo.getMaxParrafosTeoria();
+        if (min == max) {
+            return "Redacta exactamente " + min + " párrafos en total.";
+        }
+        return "Redacta entre " + min + " y " + max + " párrafos en total, distribuidos "
+                + "según la amplitud real del tema (temas simples cerca del mínimo, "
+                + "temas amplios cerca del máximo).";
     }
 
     public static String buildDiapositivasSystemPrompt(int numeroDiapositivas) {

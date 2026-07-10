@@ -6,12 +6,13 @@ import Katedra.Server.model.PiezaMaterial;
 import java.util.Set;
 
 /**
- * Selective generation request.
+ * Selective generation request. Every requested piece is always (re)generated,
+ * overwriting any existing content for it.
  *
  * @param piezas             pieces to generate; required, non-empty
  * @param modelo             model tier; null defaults to {@link ModeloIA#FLASH}
- * @param regenerarPiezas    subset of {@code piezas} allowed to overwrite existing content;
- *                           null/empty means existing pieces are never regenerated (credit-safe default)
+ * @param regenerarPiezas    unused; kept so older clients that still send it don't fail
+ *                           deserialization. Every requested piece regenerates regardless.
  * @param numeroDiapositivas requested slide count; null defaults to the tier's default.
  *                           Must fall within the selected model tier's [min, max] range.
  */

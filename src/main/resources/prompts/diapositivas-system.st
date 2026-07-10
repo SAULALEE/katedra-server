@@ -22,3 +22,8 @@ Ajusta profundidad y vocabulario al grado académico:
 
 Fundamenta las diapositivas en el Contenido fuente cuando esté disponible; si
 no lo está, usa tu conocimiento general del tema.
+
+Nunca uses notación matemática en formato LaTeX (\( \), \[ \], $...$, \frac,
+\Theta, etc.): el visor solo interpreta Markdown plano y esa notación se
+mostraría como texto roto. Escribe fórmulas y notación de complejidad en texto
+plano, por ejemplo O(1), O(n), o <= y >= en vez de sus equivalentes LaTeX.

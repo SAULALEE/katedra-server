@@ -18,11 +18,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 @Service
@@ -50,13 +49,11 @@ public class ContenidoTemarioService {
         ContenidoTemario entity = contenidoTemarioRepository.findByTemarioId(temarioId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contenido no generado. Use POST /generar-material"));
 
-        return mapToDTO(entity, List.of());
+        return mapToDTO(entity, Map.of());
     }
 
     /**
-     * Selectively generates the requested pieces. Pieces that already exist are
-     * skipped (reported in {@code piezasOmitidas}) unless explicitly listed in
-     * {@code regenerarPiezas}, so API credits are never spent by accident.
+     * Generates every requested piece, always overwriting any existing content for it.
      */
     @Transactional
     public CompletableFuture<ContenidoTemarioResponseDTO> generarMaterial(
@@ -73,32 +70,47 @@ public class ContenidoTemarioService {
 
         ModeloIA modeloTier = request.modelo() != null ? request.modelo() : ModeloIA.FLASH;
         int numeroDiapositivas = resolverNumeroDiapositivas(modeloTier, request);
-        Set<PiezaMaterial> forzar = request.regenerarPiezas() == null ? Set.of() : request.regenerarPiezas();
         // Source text for the prompts; once PDF/web ingestion lands this prefers temario source content.
         String fuente = temario.getDescripcion();
 
         Map<PiezaMaterial, CompletableFuture<?>> futures = new EnumMap<>(PiezaMaterial.class);
-        List<String> omitidas = new ArrayList<>();
-
         for (PiezaMaterial pieza : request.piezas()) {
-            if (existePieza(contenido, pieza) && !forzar.contains(pieza)) {
-                log.info("Pieza '{}' del temario {} ya existe; omitida para ahorrar créditos", pieza.getValor(), temarioId);
-                omitidas.add(pieza.getValor());
-                continue;
-            }
             futures.put(pieza, dispatch(pieza, temario, fuente, modeloTier, numeroDiapositivas));
         }
 
-        if (futures.isEmpty()) {
-            return CompletableFuture.completedFuture(mapToDTO(contenido, omitidas));
-        }
+        // Each failure is caught individually so one failed piece (e.g. an OpenAI
+        // timeout) doesn't discard the pieces that generated successfully, and the
+        // real error message reaches the API response instead of being logged only.
+        Map<PiezaMaterial, String> fallos = new EnumMap<>(PiezaMaterial.class);
+        Map<PiezaMaterial, CompletableFuture<Object>> resultados = new EnumMap<>(PiezaMaterial.class);
+        futures.forEach((pieza, future) -> resultados.put(pieza, future.handle((valor, error) -> {
+            if (error != null) {
+                log.error("Pieza '{}' del temario {} falló", pieza.getValor(), temarioId, error);
+                fallos.put(pieza, error.getMessage());
+                return null;
+            }
+            return valor;
+        })));
 
-        return CompletableFuture.allOf(futures.values().toArray(CompletableFuture[]::new))
+        return CompletableFuture.allOf(resultados.values().toArray(CompletableFuture[]::new))
                 .thenApply(v -> {
-                    futures.forEach((pieza, future) -> aplicarResultado(contenido, pieza, future.join()));
-                    contenido.setModelo(modeloTier.getValor());
+                    boolean algunExito = false;
+                    for (Map.Entry<PiezaMaterial, CompletableFuture<Object>> entry : resultados.entrySet()) {
+                        Object resultado = entry.getValue().join();
+                        if (resultado != null) {
+                            aplicarResultado(contenido, entry.getKey(), resultado);
+                            algunExito = true;
+                        }
+                    }
+
+                    // Never fail the whole request over AI provider errors (rate limits,
+                    // timeouts): report them per piece in piezasFallidas instead. modelo
+                    // only advances when it actually produced something with the new tier.
+                    if (algunExito) {
+                        contenido.setModelo(modeloTier.getValor());
+                    }
                     ContenidoTemario saved = contenidoTemarioRepository.save(contenido);
-                    return mapToDTO(saved, omitidas);
+                    return mapToDTO(saved, fallos);
                 });
     }
 
@@ -110,15 +122,6 @@ public class ContenidoTemarioService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Acceso denegado a este temario");
         }
         return temario;
-    }
-
-    private boolean existePieza(ContenidoTemario contenido, PiezaMaterial pieza) {
-        return switch (pieza) {
-            case TEORIA -> contenido.getTeoria() != null && !contenido.getTeoria().isBlank();
-            case EJERCICIOS -> contenido.getEjercicios() != null && !contenido.getEjercicios().isBlank();
-            case EVALUACION -> contenido.getEvaluacion() != null && !contenido.getEvaluacion().isEmpty();
-            case DIAPOSITIVAS -> contenido.getDiapositivas() != null && !contenido.getDiapositivas().isEmpty();
-        };
     }
 
     /**
@@ -146,12 +149,11 @@ public class ContenidoTemarioService {
         String titulo = temario.getTitulo();
         NivelAcademico nivel = temario.getGradoAcademico();
         String grado = nivel.getEtiqueta();
-        String modelo = modeloTier.getModelId();
         return switch (pieza) {
             case TEORIA -> aiContentGeneratorService.generarTeoria(asignatura, titulo, nivel, fuente, modeloTier);
-            case EJERCICIOS -> aiContentGeneratorService.generarEjercicios(asignatura, titulo, grado, fuente, modelo);
-            case EVALUACION -> aiContentGeneratorService.generarEvaluacion(asignatura, titulo, grado, fuente, modelo);
-            case DIAPOSITIVAS -> aiContentGeneratorService.generarDiapositivas(asignatura, titulo, grado, fuente, modelo, numeroDiapositivas);
+            case EJERCICIOS -> aiContentGeneratorService.generarEjercicios(asignatura, titulo, grado, fuente, modeloTier);
+            case EVALUACION -> aiContentGeneratorService.generarEvaluacion(asignatura, titulo, grado, fuente, modeloTier);
+            case DIAPOSITIVAS -> aiContentGeneratorService.generarDiapositivas(asignatura, titulo, grado, fuente, modeloTier, numeroDiapositivas);
         };
     }
 
@@ -165,7 +167,9 @@ public class ContenidoTemarioService {
         }
     }
 
-    private ContenidoTemarioResponseDTO mapToDTO(ContenidoTemario entity, List<String> piezasOmitidas) {
+    private ContenidoTemarioResponseDTO mapToDTO(ContenidoTemario entity, Map<PiezaMaterial, String> fallos) {
+        Map<String, String> piezasFallidas = new LinkedHashMap<>();
+        fallos.forEach((pieza, mensaje) -> piezasFallidas.put(pieza.getValor(), mensaje));
         return new ContenidoTemarioResponseDTO(
                 entity.getId(),
                 entity.getTemario().getId(),
@@ -174,7 +178,7 @@ public class ContenidoTemarioService {
                 entity.getEvaluacion(),
                 entity.getDiapositivas(),
                 entity.getModelo(),
-                piezasOmitidas
+                piezasFallidas
         );
     }
 }
