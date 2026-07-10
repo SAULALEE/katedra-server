@@ -33,88 +33,93 @@ public class AiContentGeneratorService {
         this.chatClient = chatClientBuilder.build();
     }
 
+    /**
+     * Builds call options for the given tier. Reasoning-style models (o-series, GPT-5
+     * family) reject {@code temperature} and require {@code max_completion_tokens}
+     * instead of {@code max_tokens}, since it also covers hidden reasoning tokens.
+     */
+    private OpenAiChatOptions.Builder buildOptions(ModeloIA modelo) {
+        OpenAiChatOptions.Builder options = OpenAiChatOptions.builder().model(modelo.getModelId());
+        if (modelo.isReasoning()) {
+            options.reasoningEffort(modelo.getReasoningEffort())
+                    .maxCompletionTokens(modelo.getMaxTokens());
+        } else {
+            options.temperature(modelo.getTemperature())
+                    .maxTokens(modelo.getMaxTokens());
+        }
+        return options;
+    }
+
     @Async
     public CompletableFuture<String> generarTeoria(
             String asignatura, String titulo, NivelAcademico nivel, String fuente, ModeloIA modelo) {
         try {
             log.info("Generando teoría [{}] para tema: {} (nivel {})", modelo.getDisplayName(), titulo, nivel.getEtiqueta());
-            OpenAiChatOptions.Builder options = OpenAiChatOptions.builder().model(modelo.getModelId());
-            if (modelo.isReasoning()) {
-                // o-series reasoning models reject `temperature` and use max_completion_tokens
-                // (which also covers hidden reasoning tokens) instead of max_tokens.
-                options.reasoningEffort(modelo.getReasoningEffort())
-                        .maxCompletionTokens(modelo.getMaxTokens());
-            } else {
-                options.temperature(modelo.getTemperature())
-                        .maxTokens(modelo.getMaxTokens());
-            }
             String texto = chatClient.prompt()
                     .system(PromptTemplates.buildTeoriaSystemPrompt(modelo, nivel))
                     .user(PromptTemplates.buildUserPrompt(asignatura, titulo, nivel.getEtiqueta(), fuente))
-                    .options(options)
+                    .options(buildOptions(modelo))
                     .call()
                     .content();
             return CompletableFuture.completedFuture(texto);
         } catch (Exception ex) {
             log.error("Error generando teoría para tema: {}", titulo, ex);
-            return CompletableFuture.completedFuture(
-                    "## Error: La generación de teoría falló. Intenta de nuevo.");
+            return CompletableFuture.failedFuture(ex);
         }
     }
 
     @Async
     public CompletableFuture<String> generarEjercicios(
-            String asignatura, String titulo, String gradoAcademico, String fuente, String modelo) {
+            String asignatura, String titulo, String gradoAcademico, String fuente, ModeloIA modelo) {
         try {
-            log.info("Generando ejercicios [{}] para tema: {}", modelo, titulo);
+            log.info("Generando ejercicios [{}] para tema: {}", modelo.getDisplayName(), titulo);
             String texto = chatClient.prompt()
                     .system(PromptTemplates.EJERCICIOS_SYSTEM_PROMPT)
                     .user(PromptTemplates.buildUserPrompt(asignatura, titulo, gradoAcademico, fuente))
-                    .options(OpenAiChatOptions.builder().model(modelo))
+                    .options(buildOptions(modelo))
                     .call()
                     .content();
             return CompletableFuture.completedFuture(texto);
         } catch (Exception ex) {
             log.error("Error generando ejercicios para tema: {}", titulo, ex);
-            return CompletableFuture.completedFuture(
-                    "## Error: La generación de ejercicios falló. Intenta de nuevo.");
+            return CompletableFuture.failedFuture(ex);
         }
     }
 
     @Async
     public CompletableFuture<List<EvaluacionPreguntaDTO>> generarEvaluacion(
-            String asignatura, String titulo, String gradoAcademico, String fuente, String modelo) {
+            String asignatura, String titulo, String gradoAcademico, String fuente, ModeloIA modelo) {
         try {
-            log.info("Generando evaluación [{}] para tema: {}", modelo, titulo);
+            log.info("Generando evaluación [{}] para tema: {}", modelo.getDisplayName(), titulo);
             List<EvaluacionPreguntaDTO> preguntas = chatClient.prompt()
                     .system(PromptTemplates.EVALUACION_SYSTEM_PROMPT)
                     .user(PromptTemplates.buildUserPrompt(asignatura, titulo, gradoAcademico, fuente))
-                    .options(OpenAiChatOptions.builder().model(modelo))
+                    .options(buildOptions(modelo))
                     .call()
                     .entity(new ParameterizedTypeReference<List<EvaluacionPreguntaDTO>>() {});
             return CompletableFuture.completedFuture(preguntas);
         } catch (Exception ex) {
             log.error("Error generando evaluación para tema: {}", titulo, ex);
-            return CompletableFuture.completedFuture(List.of());
+            return CompletableFuture.failedFuture(ex);
         }
     }
 
     @Async
     public CompletableFuture<List<DiapositivaDTO>> generarDiapositivas(
-            String asignatura, String titulo, String gradoAcademico, String fuente, String modelo,
+            String asignatura, String titulo, String gradoAcademico, String fuente, ModeloIA modelo,
             int numeroDiapositivas) {
         try {
-            log.info("Generando {} diapositivas [{}] para tema: {}", numeroDiapositivas, modelo, titulo);
+            log.info("Generando {} diapositivas [{}] para tema: {}", numeroDiapositivas, modelo.getDisplayName(), titulo);
             List<DiapositivaDTO> diapositivas = chatClient.prompt()
                     .system(PromptTemplates.buildDiapositivasSystemPrompt(numeroDiapositivas))
                     .user(PromptTemplates.buildUserPrompt(asignatura, titulo, gradoAcademico, fuente))
-                    .options(OpenAiChatOptions.builder().model(modelo))
+                    .options(buildOptions(modelo))
                     .call()
                     .entity(new ParameterizedTypeReference<List<DiapositivaDTO>>() {});
             return CompletableFuture.completedFuture(diapositivas);
         } catch (Exception ex) {
             log.error("Error generando diapositivas para tema: {}", titulo, ex);
-            return CompletableFuture.completedFuture(List.of());
+            return CompletableFuture.failedFuture(ex);
         }
     }
 }

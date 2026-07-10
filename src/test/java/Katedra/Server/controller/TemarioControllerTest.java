@@ -22,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -139,7 +140,7 @@ class TemarioControllerTest {
     void shouldGetContenidoByTemarioId() throws Exception {
         var contenidoResponse = new Katedra.Server.dto.ContenidoTemarioResponseDTO(
                 "contenido-uuid-789", "temario-uuid-123", "## Teoría", "## Ejercicios",
-                List.of(), List.of(), "flash", List.of());
+                List.of(), List.of(), "flash", Map.of());
         given(contenidoTemarioService.getContenidoByTemarioId("temario-uuid-123", "profesor@katedra.com"))
                 .willReturn(contenidoResponse);
 
@@ -165,7 +166,7 @@ class TemarioControllerTest {
                 "contenido-uuid-789", "temario-uuid-123", null, null,
                 List.of(new Katedra.Server.dto.EvaluacionPreguntaDTO(
                         "¿Pregunta?", List.of("A", "B", "C", "D"), 0, "Explicación")),
-                null, "flash", List.of());
+                null, "flash", Map.of());
         given(contenidoTemarioService.generarMaterial(
                 eq("temario-uuid-123"), eq("profesor@katedra.com"),
                 any(Katedra.Server.dto.GenerarMaterialRequestDTO.class)))
@@ -187,33 +188,6 @@ class TemarioControllerTest {
         verify(contenidoTemarioService).generarMaterial(
                 eq("temario-uuid-123"), eq("profesor@katedra.com"),
                 any(Katedra.Server.dto.GenerarMaterialRequestDTO.class));
-    }
-
-    @Test
-    void shouldReportOmittedPiecesInResponse() throws Exception {
-        String jsonRequest = """
-                {
-                    "piezas": ["teoria", "evaluacion"]
-                }
-                """;
-        var contenidoResponse = new Katedra.Server.dto.ContenidoTemarioResponseDTO(
-                "contenido-uuid-789", "temario-uuid-123", "## Teoría IA", null,
-                List.of(), null, "flash", List.of("evaluacion"));
-        given(contenidoTemarioService.generarMaterial(
-                eq("temario-uuid-123"), eq("profesor@katedra.com"),
-                any(Katedra.Server.dto.GenerarMaterialRequestDTO.class)))
-                .willReturn(CompletableFuture.completedFuture(contenidoResponse));
-
-        var mvcResult = mockMvc.perform(post("/temarios/temario-uuid-123/generar-material")
-                        .principal(mockPrincipal)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(jsonRequest))
-                .andExpect(request().asyncStarted())
-                .andReturn();
-
-        mockMvc.perform(asyncDispatch(mvcResult))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.piezasOmitidas[0]").value("evaluacion"));
     }
 
     @Test

@@ -1,13 +1,14 @@
 package Katedra.Server.dto;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Generated material for a syllabus.
  *
  * @param modelo         last model used to generate content (null if never generated)
- * @param piezasOmitidas pieces skipped because they already existed and were not
- *                       force-regenerated; empty on plain GET
+ * @param piezasFallidas pieces whose generation failed, mapped to the underlying error
+ *                       message (e.g. an OpenAI API error); empty on plain GET or full success
  */
 public record ContenidoTemarioResponseDTO(
     String id,
@@ -17,5 +18,5 @@ public record ContenidoTemarioResponseDTO(
     List<EvaluacionPreguntaDTO> evaluacion,
     List<DiapositivaDTO> diapositivas,
     String modelo,
-    List<String> piezasOmitidas
+    Map<String, String> piezasFallidas
 ) {}
