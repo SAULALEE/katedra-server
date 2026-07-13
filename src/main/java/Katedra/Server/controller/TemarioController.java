@@ -2,11 +2,17 @@ package Katedra.Server.controller;
 
 import Katedra.Server.dto.TemarioRequestDTO;
 import Katedra.Server.dto.TemarioResponseDTO;
+import Katedra.Server.dto.TemarioUploadResponseDTO;
+import Katedra.Server.dto.TemarioDriveRequestDTO;
+import Katedra.Server.dto.TemarioUrlRequestDTO;
+import Katedra.Server.dto.GenerarMaterialTemarioRequestDTO;
 import Katedra.Server.service.TemarioService;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -41,6 +47,37 @@ public class TemarioController {
             Authentication authentication) {
         String userEmail = authentication.getName();
         TemarioResponseDTO created = temarioService.createTemario(userEmail, request);
+        return new ResponseEntity<>(created, HttpStatus.CREATED);
+    }
+
+    @PostMapping(value = "/cargar/archivo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<TemarioUploadResponseDTO> cargarTemarioArchivo(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam String titulo,
+            @RequestParam String asignatura,
+            @RequestParam String gradoAcademico,
+            Authentication authentication) {
+        String userEmail = authentication.getName();
+        TemarioUploadResponseDTO created = temarioService.cargarTemarioArchivo(
+                userEmail, file, titulo, asignatura, gradoAcademico);
+        return new ResponseEntity<>(created, HttpStatus.CREATED);
+    }
+
+    @PostMapping("/cargar/url")
+    public ResponseEntity<TemarioUploadResponseDTO> cargarTemarioUrl(
+            @RequestBody TemarioUrlRequestDTO request,
+            Authentication authentication) {
+        String userEmail = authentication.getName();
+        TemarioUploadResponseDTO created = temarioService.cargarTemarioUrl(userEmail, request);
+        return new ResponseEntity<>(created, HttpStatus.CREATED);
+    }
+
+    @PostMapping("/cargar/drive")
+    public ResponseEntity<TemarioUploadResponseDTO> cargarTemarioDrive(
+            @RequestBody TemarioDriveRequestDTO request,
+            Authentication authentication) {
+        String userEmail = authentication.getName();
+        TemarioUploadResponseDTO created = temarioService.cargarTemarioDrive(userEmail, request);
         return new ResponseEntity<>(created, HttpStatus.CREATED);
     }
 
@@ -117,9 +154,10 @@ public class TemarioController {
     @PostMapping("/{id}/generar-material")
     public CompletableFuture<ResponseEntity<Katedra.Server.dto.ContenidoTemarioResponseDTO>> generarMaterial(
             @PathVariable String id,
+            @RequestBody(required = false) GenerarMaterialTemarioRequestDTO request,
             Authentication authentication) {
         String userEmail = authentication.getName();
-        return contenidoTemarioService.generarMaterial(id, userEmail)
+        return contenidoTemarioService.generarMaterial(id, userEmail, request)
                 .thenApply(ResponseEntity::ok)
                 .exceptionally(ex -> ResponseEntity.internalServerError().build());
     }
