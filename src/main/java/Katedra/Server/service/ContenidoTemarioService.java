@@ -2,6 +2,7 @@ package Katedra.Server.service;
 
 import Katedra.Server.dto.ContenidoTemarioResponseDTO;
 import Katedra.Server.dto.GenerarMaterialRequestDTO;
+import Katedra.Server.dto.GenerarMaterialTemarioRequestDTO;
 import Katedra.Server.model.ContenidoTemario;
 import Katedra.Server.model.Temario;
 import Katedra.Server.repository.ContenidoTemarioRepository;
@@ -12,10 +13,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 @Service
 public class ContenidoTemarioService {
+
+    private static final Set<String> PIEZAS_PERMITIDAS = Set.of("teoria", "ejercicios", "evaluacion", "diapositivas");
 
     private final ContenidoTemarioRepository contenidoTemarioRepository;
     private final TemarioRepository temarioRepository;
@@ -50,12 +56,23 @@ public class ContenidoTemarioService {
 
     @Transactional
     public CompletableFuture<ContenidoTemarioResponseDTO> generarMaterial(String temarioId, String userEmail) {
+        return generarMaterial(temarioId, userEmail, null);
+    }
+
+    @Transactional
+    public CompletableFuture<ContenidoTemarioResponseDTO> generarMaterial(
+            String temarioId,
+            String userEmail,
+            GenerarMaterialTemarioRequestDTO request) {
         var temario = temarioRepository.findById(temarioId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Temario no encontrado"));
 
         if (!temario.getUsuario().getEmail().equals(userEmail)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Acceso denegado a este temario");
         }
+
+        ModeloGeneracion modeloGeneracion = mapModelo(request == null ? null : request.modelo());
+        List<String> piezasOmitidas = resolvePiezasOmitidas(request);
 
         return aiContentGeneratorService.generarContenido(
                         temario.getAsignatura(), temario.getTitulo(),
@@ -67,7 +84,7 @@ public class ContenidoTemarioService {
                     contenido.setEjercicios(aiContenido.ejercicios());
                     contenido.setEvaluacion(aiContenido.evaluacion());
                     contenido.setDiapositivas(aiContenido.diapositivas());
-                    return mapToDTO(contenidoTemarioRepository.save(contenido));
+                    return mapToDTO(contenidoTemarioRepository.save(contenido), piezasOmitidas);
                 });
     }
 
@@ -93,13 +110,51 @@ public class ContenidoTemarioService {
     }
 
     private ContenidoTemarioResponseDTO mapToDTO(ContenidoTemario entity) {
+        return mapToDTO(entity, List.of());
+    }
+
+    private ContenidoTemarioResponseDTO mapToDTO(ContenidoTemario entity, List<String> piezasOmitidas) {
         return new ContenidoTemarioResponseDTO(
                 entity.getId(),
                 entity.getTemario().getId(),
                 entity.getTeoria(),
                 entity.getEjercicios(),
                 entity.getEvaluacion(),
-                entity.getDiapositivas()
+                entity.getDiapositivas(),
+                piezasOmitidas
         );
+    }
+
+    private ModeloGeneracion mapModelo(String modelo) {
+        if ("gpt-4o".equals(modelo)) {
+            return ModeloGeneracion.AVANZADO;
+        }
+        return ModeloGeneracion.BASICO;
+    }
+
+    private List<String> resolvePiezasOmitidas(GenerarMaterialTemarioRequestDTO request) {
+        if (request == null) {
+            return List.of();
+        }
+        List<String> piezasOmitidas = new ArrayList<>();
+        addUnsupportedPiezas(request.piezas(), piezasOmitidas);
+        addUnsupportedPiezas(request.regenerarPiezas(), piezasOmitidas);
+        return piezasOmitidas;
+    }
+
+    private void addUnsupportedPiezas(List<String> piezas, List<String> piezasOmitidas) {
+        if (piezas == null) {
+            return;
+        }
+        for (String pieza : piezas) {
+            if (pieza == null || !PIEZAS_PERMITIDAS.contains(pieza)) {
+                piezasOmitidas.add(pieza);
+            }
+        }
+    }
+
+    private enum ModeloGeneracion {
+        BASICO,
+        AVANZADO
     }
 }

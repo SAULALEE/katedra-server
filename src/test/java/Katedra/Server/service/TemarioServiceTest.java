@@ -2,9 +2,13 @@ package Katedra.Server.service;
 
 import Katedra.Server.dto.TemarioRequestDTO;
 import Katedra.Server.dto.TemarioResponseDTO;
+import Katedra.Server.dto.TemarioDriveRequestDTO;
+import Katedra.Server.dto.TemarioUrlRequestDTO;
 import Katedra.Server.model.RolUsuario;
+import Katedra.Server.model.ContenidoTemario;
 import Katedra.Server.model.Temario;
 import Katedra.Server.model.Usuario;
+import Katedra.Server.repository.ContenidoTemarioRepository;
 import Katedra.Server.repository.TemarioRepository;
 import Katedra.Server.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +39,18 @@ class TemarioServiceTest {
 
     @Mock
     private UsuarioRepository usuarioRepository;
+
+    @Mock
+    private ContenidoTemarioRepository contenidoTemarioRepository;
+
+    @Mock
+    private TemarioFileExtractionService temarioFileExtractionService;
+
+    @Mock
+    private TemarioUrlExtractionService temarioUrlExtractionService;
+
+    @Mock
+    private TemarioGoogleDriveDownloadService temarioGoogleDriveDownloadService;
 
     @InjectMocks
     private TemarioService temarioService;
@@ -217,5 +233,84 @@ class TemarioServiceTest {
         assertThat(exception.getMessage()).isEqualTo("Acceso denegado a este temario");
         verify(temarioRepository).findById(mockTemario.getId());
         verify(temarioRepository, never()).delete(any(Temario.class));
+    }
+
+    @Test
+    void shouldLoadTemarioFromExtractedFile() {
+        var file = new org.springframework.mock.web.MockMultipartFile(
+                "file", "temario.md", "text/markdown", "# Temario".getBytes());
+        var extracted = new TemarioFileExtractionService.ExtractedTemarioFile(
+                "temario.md", "text/markdown", "# Temario");
+        given(usuarioRepository.findByEmail(mockUsuario.getEmail())).willReturn(Optional.of(mockUsuario));
+        given(temarioFileExtractionService.extract(file)).willReturn(extracted);
+        given(temarioRepository.save(any(Temario.class))).willReturn(mockTemario);
+        given(contenidoTemarioRepository.save(any(ContenidoTemario.class))).willAnswer(invocation -> {
+            ContenidoTemario saved = invocation.getArgument(0);
+            saved.setId("contenido-uuid-789");
+            return saved;
+        });
+
+        var response = temarioService.cargarTemarioArchivo(
+                mockUsuario.getEmail(), file, "Curso de Spring Boot", "Programacion", "Universidad");
+
+        assertThat(response.temario().id()).isEqualTo("temario-uuid-456");
+        assertThat(response.contenidoId()).isEqualTo("contenido-uuid-789");
+        assertThat(response.archivoNombre()).isEqualTo("temario.md");
+        assertThat(response.caracteresExtraidos()).isEqualTo(9);
+        verify(contenidoTemarioRepository).save(any(ContenidoTemario.class));
+    }
+
+    @Test
+    void shouldLoadTemarioFromExtractedUrl() {
+        var request = new TemarioUrlRequestDTO(
+                "https://example.com/temario", "Temario Web", "Programacion", "Universidad");
+        var extracted = new TemarioUrlExtractionService.ExtractedTemarioUrl(
+                "https://example.com/temario", "Example Title", "Contenido web limpio");
+        given(usuarioRepository.findByEmail(mockUsuario.getEmail())).willReturn(Optional.of(mockUsuario));
+        given(temarioUrlExtractionService.extract(request.url())).willReturn(extracted);
+        given(temarioRepository.save(any(Temario.class))).willReturn(mockTemario);
+        given(contenidoTemarioRepository.save(any(ContenidoTemario.class))).willAnswer(invocation -> {
+            ContenidoTemario saved = invocation.getArgument(0);
+            saved.setId("contenido-uuid-790");
+            return saved;
+        });
+
+        var response = temarioService.cargarTemarioUrl(mockUsuario.getEmail(), request);
+
+        assertThat(response.temario().id()).isEqualTo("temario-uuid-456");
+        assertThat(response.contenidoId()).isEqualTo("contenido-uuid-790");
+        assertThat(response.fuenteUrl()).isEqualTo("https://example.com/temario");
+        assertThat(response.archivoNombre()).isNull();
+        assertThat(response.caracteresExtraidos()).isEqualTo(20);
+        verify(contenidoTemarioRepository).save(any(ContenidoTemario.class));
+    }
+
+    @Test
+    void shouldLoadTemarioFromPublicDriveLink() {
+        var request = new TemarioDriveRequestDTO(
+                "https://drive.google.com/file/d/file-123/view", "Temario Drive", "Programacion", "Universidad");
+        var file = new org.springframework.mock.web.MockMultipartFile(
+                "file", "drive-temario.md", "text/markdown", "# Drive".getBytes());
+        var downloaded = new TemarioGoogleDriveDownloadService.DownloadedDriveFile("file-123", file);
+        var extracted = new TemarioFileExtractionService.ExtractedTemarioFile(
+                "drive-temario.md", "text/markdown", "# Drive");
+        given(usuarioRepository.findByEmail(mockUsuario.getEmail())).willReturn(Optional.of(mockUsuario));
+        given(temarioGoogleDriveDownloadService.download(request.url())).willReturn(downloaded);
+        given(temarioFileExtractionService.extract(file)).willReturn(extracted);
+        given(temarioRepository.save(any(Temario.class))).willReturn(mockTemario);
+        given(contenidoTemarioRepository.save(any(ContenidoTemario.class))).willAnswer(invocation -> {
+            ContenidoTemario saved = invocation.getArgument(0);
+            saved.setId("contenido-uuid-791");
+            return saved;
+        });
+
+        var response = temarioService.cargarTemarioDrive(mockUsuario.getEmail(), request);
+
+        assertThat(response.temario().id()).isEqualTo("temario-uuid-456");
+        assertThat(response.contenidoId()).isEqualTo("contenido-uuid-791");
+        assertThat(response.archivoNombre()).isEqualTo("drive-temario.md");
+        assertThat(response.fuenteUrl()).isEqualTo("https://drive.google.com/file/d/file-123/view");
+        assertThat(response.caracteresExtraidos()).isEqualTo(7);
+        verify(contenidoTemarioRepository).save(any(ContenidoTemario.class));
     }
 }

@@ -5,6 +5,7 @@ import Katedra.Server.dto.ContenidoTemarioResponseDTO;
 import Katedra.Server.dto.DiapositivaDTO;
 import Katedra.Server.dto.EvaluacionPreguntaDTO;
 import Katedra.Server.dto.GenerarMaterialRequestDTO;
+import Katedra.Server.dto.GenerarMaterialTemarioRequestDTO;
 import Katedra.Server.model.ContenidoTemario;
 import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.Temario;
@@ -181,6 +182,30 @@ class ContenidoTemarioServiceTest {
         assertThat(response.id()).isEqualTo("contenido-uuid-789");
         assertThat(existing.getTeoria()).isEqualTo("## Teoría generada");
         verify(contenidoTemarioRepository).save(existing);
+    }
+
+    @Test
+    void shouldAcceptFrontendGenerarMaterialRequest() throws ExecutionException, InterruptedException {
+        GenerarMaterialTemarioRequestDTO request = new GenerarMaterialTemarioRequestDTO(
+                List.of("teoria", "ejercicios", "pieza-desconocida"), "gpt-4o", List.of());
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.empty());
+        given(aiContentGeneratorService.generarContenido("Programacion", "Estructuras de Datos", "Pilas y colas", "Universitario"))
+                .willReturn(CompletableFuture.completedFuture(mockAiContenido));
+        given(contenidoTemarioRepository.save(any(ContenidoTemario.class)))
+                .willAnswer(invocation -> {
+                    ContenidoTemario saved = invocation.getArgument(0);
+                    saved.setId("contenido-uuid-789");
+                    return saved;
+                });
+
+        ContenidoTemarioResponseDTO response =
+                contenidoTemarioService.generarMaterial("temario-uuid-456", "profesor@katedra.com", request).get();
+
+        assertThat(response.teoria()).isEqualTo("## Teoría generada");
+        assertThat(response.ejercicios()).isEqualTo("## Ejercicios generados");
+        assertThat(response.piezasOmitidas()).containsExactly("pieza-desconocida");
+        verify(contenidoTemarioRepository).save(any(ContenidoTemario.class));
     }
 
     // --- generarMaterialDesdeCero ---
