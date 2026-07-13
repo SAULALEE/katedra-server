@@ -103,29 +103,6 @@ class AiContentGeneratorServiceTest {
                 .cause().hasMessageContaining("API unavailable");
     }
 
-    // --- ejercicios ---
-
-    @Test
-    void shouldGenerateEjerciciosMarkdown() throws ExecutionException, InterruptedException {
-        stubContent("## Ejercicios de prueba");
-
-        String result = service.generarEjercicios("Programacion", "Pilas", "Universitario", "Pilas y colas", MODELO).get();
-
-        assertThat(result).isEqualTo("## Ejercicios de prueba");
-    }
-
-    @Test
-    void shouldPropagateFailureWhenEjerciciosAiCallFails() {
-        stubFailure();
-
-        CompletableFuture<String> future =
-                service.generarEjercicios("Programacion", "Pilas", "Universitario", null, MODELO);
-
-        assertThatThrownBy(future::get)
-                .hasCauseInstanceOf(RuntimeException.class)
-                .cause().hasMessageContaining("API unavailable");
-    }
-
     // --- evaluacion ---
 
     @Test
@@ -134,8 +111,8 @@ class AiContentGeneratorServiceTest {
                 new EvaluacionPreguntaDTO("¿Qué es una pila?", List.of("A", "B", "C", "D"), 1, "LIFO"));
         stubEntity(preguntas);
 
-        List<EvaluacionPreguntaDTO> result =
-                service.generarEvaluacion("Programacion", "Pilas", "Universitario", "Pilas y colas", MODELO).get();
+        List<EvaluacionPreguntaDTO> result = service.generarEvaluacion(
+                "Programacion", "Pilas", NivelAcademico.UNIVERSITARIO, "Pilas y colas", MODELO).get();
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().pregunta()).isEqualTo("¿Qué es una pila?");
@@ -146,8 +123,8 @@ class AiContentGeneratorServiceTest {
     void shouldPropagateFailureWhenEvaluacionAiCallFails() {
         stubFailure();
 
-        CompletableFuture<List<EvaluacionPreguntaDTO>> future =
-                service.generarEvaluacion("Programacion", "Pilas", "Universitario", null, MODELO);
+        CompletableFuture<List<EvaluacionPreguntaDTO>> future = service.generarEvaluacion(
+                "Programacion", "Pilas", NivelAcademico.UNIVERSITARIO, null, MODELO);
 
         assertThatThrownBy(future::get)
                 .hasCauseInstanceOf(RuntimeException.class)

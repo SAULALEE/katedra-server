@@ -62,11 +62,15 @@ The API and persisted data (`ContenidoTemario.modelo`) expose only the **tier ke
 (Spring AI can swap providers with a config change) and avoids leaking implementation
 details to clients.
 
-| Tier | Display name | Model | Teoría párrafos | Options |
-|---|---|---|---|---|
-| `FLASH` | Tutor | `gpt-4.1-mini` | 4–5 | temperature 0.5, maxTokens ~1500 |
-| `PRO` | Maestro | `gpt-5.4` | 6–8 | temperature 0.6, maxTokens ~2500 |
-| `MAX` | Catedrático | o-series (reasoning) | 8–10 | reasoningEffort=medium, **no temperature**, maxCompletionTokens |
+| Tier | Display name | Model | Teoría párrafos | Ejercicios | Preguntas examen | Options |
+|---|---|---|---|---|---|---|
+| `FLASH` | Tutor | `gpt-4.1-mini` | 6–10 | 5 | 5 | temperature 0.5, maxTokens 2500 |
+| `PRO` | Maestro | `gpt-5.4` | 10–18 | 10 | 10 | reasoningEffort=medium, maxCompletionTokens 6500 |
+| `MAX` | Catedrático | `o4-mini` (reasoning) | 12–20 | 15–20 | 15–20 | reasoningEffort=medium, **no temperature**, maxCompletionTokens 12000 |
+
+Each tier also carries `estiloEjercicios` (independent from `estiloTeoria`): Tutor is
+rápido y directo, Maestro razonado y analítico, Catedrático práctico y lógico-matemático
+with the best questions selected rather than the max count reached for its own sake.
 
 **Avoid wasting tokens:** reasoning models bill hidden "thinking" tokens in addition to
 the visible answer (a 500-token answer can consume 2000+ total tokens). Only `MAX` uses
@@ -75,21 +79,47 @@ let a cheap tier accidentally call a reasoning model, and never set `temperature
 reasoning-tier call (the API rejects it).
 
 ## 6. Response format strategy
-- **Prose content** (teoria, ejercicios): plain markdown via `.call().content()`. No
+- **Prose content** (teoria): plain markdown via `.call().content()`. No
   `response_format`/JSON — forcing prose into JSON wastes tokens and hurts readability.
-- **Structured content** (evaluacion, diapositivas): OpenAI Structured Outputs via Spring
-  AI's `.call().entity(new ParameterizedTypeReference<...>() {})` — never hand-roll JSON
-  parsing (this is what `ai-integration.md` already mandates project-wide).
+- **Structured content** (ejercicios, evaluacion, diapositivas): OpenAI Structured Outputs
+  via Spring AI's `.call().entity(new ParameterizedTypeReference<...>() {})` — never
+  hand-roll JSON parsing (this is what `ai-integration.md` already mandates
+  project-wide). Ejercicios moved from prose to `List<EjercicioDTO>` (titulo, tipo,
+  dificultad, tiempoEstimado, enunciado, conceptosClave, pistas, solucion) so the
+  frontend renders each exercise as its own interactive card instead of parsing markdown
+  headings — this is the one exception to "prose for non-inherently-structured content":
+  interactive material needs a field per UI element (badges for tipo/dificultad/tiempo,
+  concept chips linking back to the theory, a progressive reveal-next-hint control over
+  `pistas`) that markdown can't express cleanly. `tipo` has six values (conceptual,
+  aplicado, analisis, practico, caso, reflexion); each tier's `estiloEjercicios` fixes
+  its own hint count (Tutor 1, Maestro 2, Catedrático 2–3), time range, and preferred
+  types, so the card texture differs visibly across tiers.
 
-## 7. Roadmap
+## 7. Theory grounding for ejercicios/evaluacion
+Both pieces are generated **from the theory text**, never from the raw syllabus source
+(`temario.descripcion`) — the exercises/exam must test what the student actually read.
+`ContenidoTemarioService.generarMaterial`:
+- Rejects the request with 400 if `EJERCICIOS`/`EVALUACION` is requested without
+  `TEORIA` in the same request AND no theory already persisted for the topic
+  ("Genera la teoría primero...").
+- When `TEORIA` **is** requested alongside them, sequences it first via
+  `CompletableFuture#thenCompose` and reuses its output as the grounding text — never
+  calls `generarTeoria` twice.
+- Otherwise reuses the persisted `ContenidoTemario.teoria`.
+
+## 8. Roadmap
 Four-phase rollout, each phase reusing this same method + rubric + tier table:
 1. **Teoría** (done) — dynamic `buildTeoriaSystemPrompt(modelo, nivel)`.
-2. **Ejercicios interactivos** — extend the tier's paragraph/item-count targets to
-   exercise count and interactivity; still prose or lightly structured.
-3. **Exámenes** — extend `EVALUACION_SYSTEM_PROMPT` with per-tier item count and
-   cognitive-level distribution, keep Structured Outputs.
+2. **Ejercicios interactivos** (done) — `buildEjerciciosSystemPrompt(modelo, nivel)`,
+   per-tier count via `estiloEjercicios` + `minEjercicios`/`maxEjercicios`, structured
+   output (`List<EjercicioDTO>`), grounded in theory (§7).
+3. **Exámenes** (done) — `buildEvaluacionSystemPrompt(modelo, nivel)`, per-tier item
+   count via `minPreguntas`/`maxPreguntas`, cognitive-level distribution cycles across
+   the larger tiers, Structured Outputs, grounded in theory (§7).
 4. **Diapositivas** — extend `buildDiapositivasSystemPrompt` with per-tier
-   narrative-arc depth, keep Structured Outputs.
+   narrative-arc depth, keep Structured Outputs. Still sourced from
+   `temario.descripcion`, not theory-grounded (slides summarize the syllabus, not the
+   generated theory).
 
 When implementing a later phase, mirror `buildTeoriaSystemPrompt`'s pattern: a new
 `.st` resource file plus a `build...SystemPrompt(ModeloIA modelo, NivelAcademico nivel, ...)`

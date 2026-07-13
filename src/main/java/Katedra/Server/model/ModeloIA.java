@@ -13,8 +13,9 @@ import com.fasterxml.jackson.annotation.JsonValue;
 public enum ModeloIA {
     FLASH(
             "flash", "Tutor", "gpt-4.1-mini",
-            1, 8, 5,
-            6, 10,
+            8, 8, 8,
+            3, 5,
+            3, 5,
             0.5, 2500, false, null,
             """
             Estilo TUTOR — rápido y directo, pero SIEMPRE completo: el tono es ágil \
@@ -24,12 +25,19 @@ public enum ModeloIA {
             una respuesta apresurada o inconclusa. No profundices en matices \
             secundarios ni en comparaciones extensas — eso es trabajo de niveles \
             superiores — pero nunca sacrifiques completitud ni claridad por \
-            brevedad."""),
+            brevedad.""",
+            """
+            Estilo TUTOR — examen rápido y esencial: cada pregunta evalúa un solo \
+            concepto central, con enunciados cortos y sin contexto extenso. \
+            Prioriza los niveles de recordar/comprender y aplicar en situaciones \
+            sencillas. Las explicaciones son breves pero completas: siempre \
+            justifican la respuesta correcta sin rodeos."""),
     PRO(
             "pro", "Maestro", "gpt-5.4",
-            6, 12, 9,
-            10, 18,
-            null, 6500, true, "medium",
+            15, 15, 15,
+            5, 8,
+            5, 7,
+            null, 6000, true, "low",
             """
             Estilo MAESTRO — respuestas razonadas, coherentes y analíticas, con \
             mucho razonamiento explícito: no te limites a enunciar conceptos, \
@@ -39,11 +47,19 @@ public enum ModeloIA {
             paso, sin omitir ningún paso del razonamiento. Los párrafos pueden ser \
             extensos si el tema lo amerita: prioriza la coherencia argumentativa \
             sobre la brevedad. El desarrollo debe sentirse como la explicación de \
-            un profesor que profundiza muy por encima de lo básico."""),
+            un profesor que profundiza muy por encima de lo básico.""",
+            """
+            Estilo MAESTRO — examen razonado y con contexto: la mayoría de las \
+            preguntas plantea una situación concreta o un mini-caso que exige \
+            aplicar y analizar el concepto, no solo recordarlo. Los distractores \
+            encarnan los errores conceptuales típicos del estudiante, y cada \
+            explicación desmonta explícitamente ese error además de justificar \
+            la opción correcta."""),
     MAX(
             "max", "Catedrático", "o4-mini",
-            9, 15, 12,
-            12, 20,
+            20, 20, 20,
+            8, 12,
+            15, 20,
             null, 12000, true, "medium",
             """
             Estilo CATEDRÁTICO — el nivel más alto y potente posible, con registro \
@@ -73,7 +89,15 @@ public enum ModeloIA {
             técnico, su atención al detalle y la extensión de cada párrafo \
             individual deben ser inconfundiblemente superiores a los de Maestro, \
             de modo que cualquier lector note de inmediato que está ante la \
-            respuesta más completa, profesional y poderosa posible.""");
+            respuesta más completa, profesional y poderosa posible.""",
+            """
+            Estilo CATEDRÁTICO — el examen más riguroso posible: preguntas \
+            multi-paso de análisis y diagnóstico, con escenarios realistas, datos \
+            concretos, comparaciones entre enfoques y casos límite. Los \
+            distractores son sutiles y solo distinguibles con dominio profundo \
+            del tema, nunca descartables por sentido común. Cada explicación \
+            justifica formalmente la opción correcta y detalla por qué falla \
+            cada distractor.""");
 
     private final String valor;
     private final String displayName;
@@ -83,17 +107,21 @@ public enum ModeloIA {
     private final int defaultDiapositivas;
     private final int minParrafosTeoria;
     private final int maxParrafosTeoria;
+    private final int minPreguntas;
+    private final int maxPreguntas;
     private final Double temperature;
     private final int maxTokens;
     private final boolean reasoning;
     private final String reasoningEffort;
     private final String estiloTeoria;
+    private final String estiloEvaluacion;
 
     ModeloIA(String valor, String displayName, String modelId,
              int minDiapositivas, int maxDiapositivas, int defaultDiapositivas,
              int minParrafosTeoria, int maxParrafosTeoria,
+             int minPreguntas, int maxPreguntas,
              Double temperature, int maxTokens, boolean reasoning, String reasoningEffort,
-             String estiloTeoria) {
+             String estiloTeoria, String estiloEvaluacion) {
         this.valor = valor;
         this.displayName = displayName;
         this.modelId = modelId;
@@ -102,11 +130,14 @@ public enum ModeloIA {
         this.defaultDiapositivas = defaultDiapositivas;
         this.minParrafosTeoria = minParrafosTeoria;
         this.maxParrafosTeoria = maxParrafosTeoria;
+        this.minPreguntas = minPreguntas;
+        this.maxPreguntas = maxPreguntas;
         this.temperature = temperature;
         this.maxTokens = maxTokens;
         this.reasoning = reasoning;
         this.reasoningEffort = reasoningEffort;
         this.estiloTeoria = estiloTeoria;
+        this.estiloEvaluacion = estiloEvaluacion;
     }
 
     @JsonValue
@@ -142,6 +173,14 @@ public enum ModeloIA {
         return maxParrafosTeoria;
     }
 
+    public int getMinPreguntas() {
+        return minPreguntas;
+    }
+
+    public int getMaxPreguntas() {
+        return maxPreguntas;
+    }
+
     /** Null for reasoning tiers: temperature is rejected by o-series and GPT-5 family models. */
     public Double getTemperature() {
         return temperature;
@@ -173,6 +212,15 @@ public enum ModeloIA {
      */
     public String getEstiloTeoria() {
         return estiloTeoria;
+    }
+
+    /**
+     * Tier-specific cognitive style for exam generation (Tutor: rápido y esencial;
+     * Maestro: razonado y con contexto; Catedrático: el examen más riguroso posible,
+     * con distractores sutiles y justificación formal).
+     */
+    public String getEstiloEvaluacion() {
+        return estiloEvaluacion;
     }
 
     @JsonCreator

@@ -1,12 +1,23 @@
-Eres un experto académico y evaluador educativo. Formula exactamente 3
-preguntas de opción múltiple, en español académico impecable, que evalúen con
-rigor la comprensión del tema.
+{katedraContext}
+Formula un examen de opción múltiple, en español académico impecable, que
+evalúe con rigor la comprensión del tema. El formato de salida es el mismo
+en todos los niveles: preguntas con sus opciones y la respuesta correcta
+justificada; lo que cambia por nivel es la cantidad y la profundidad.
 
-Las 3 preguntas deben abarcar niveles cognitivos DISTINTOS y crecientes, para
-que la evaluación sea variada en cada generación:
-- Pregunta 1: recordar o comprender (definiciones e ideas centrales)
-- Pregunta 2: aplicar (usar el concepto en una situación concreta)
-- Pregunta 3: analizar (comparar, inferir, interpretar o diagnosticar un caso)
+Adapta el registro al nivel del estudiante:
+{nivelRubrica}
+
+Estilo y profundidad obligatorios de este nivel de generación (además del
+nivel académico del estudiante, define el enfoque de TODO el examen):
+{estiloEvaluacion}
+
+{cantidadInstruccion}
+
+Distribuye las preguntas en niveles cognitivos DISTINTOS y crecientes a lo
+largo del examen, repitiendo el ciclo si la cantidad de preguntas lo requiere:
+- Recordar o comprender (definiciones e ideas centrales)
+- Aplicar (usar el concepto en una situación concreta)
+- Analizar (comparar, inferir, interpretar o diagnosticar un caso)
 
 Cada pregunta ofrece cuatro opciones: una correcta y tres distractores
 plausibles y no triviales. Los distractores deben representar errores o
@@ -17,14 +28,9 @@ incorrectas. Está prohibido usar comodines como "todas las anteriores" o
 Cada explicación debe justificar por qué la respuesta correcta lo es y,
 brevemente, por qué los distractores principales son incorrectos.
 
-Ajusta la dificultad y el vocabulario al grado académico:
-- Nivel escolar: enunciados claros y contextos cotidianos
-- Pregrado: rigor conceptual y aplicación en escenarios técnicos
-- Posgrado: casos con matices, análisis crítico y juicio experto
-
-Fundamenta las preguntas en el Contenido fuente cuando esté disponible; si no
-lo está, usa tu conocimiento general del tema. Varía los enunciados y los
-enfoques en cada generación para evitar repeticiones.
+Fundamenta las preguntas en el Contenido fuente proporcionado (la teoría ya
+generada para este tema): no inventes conceptos ajenos a ese material. Varía
+los enunciados y los enfoques en cada generación para evitar repeticiones.
 
 Nunca uses notación matemática en formato LaTeX (\( \), \[ \], $...$, \frac,
 \Theta, etc.): el visor solo interpreta Markdown plano y esa notación se

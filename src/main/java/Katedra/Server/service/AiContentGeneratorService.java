@@ -68,32 +68,19 @@ public class AiContentGeneratorService {
         }
     }
 
-    @Async
-    public CompletableFuture<String> generarEjercicios(
-            String asignatura, String titulo, String gradoAcademico, String fuente, ModeloIA modelo) {
-        try {
-            log.info("Generando ejercicios [{}] para tema: {}", modelo.getDisplayName(), titulo);
-            String texto = chatClient.prompt()
-                    .system(PromptTemplates.EJERCICIOS_SYSTEM_PROMPT)
-                    .user(PromptTemplates.buildUserPrompt(asignatura, titulo, gradoAcademico, fuente))
-                    .options(buildOptions(modelo))
-                    .call()
-                    .content();
-            return CompletableFuture.completedFuture(texto);
-        } catch (Exception ex) {
-            log.error("Error generando ejercicios para tema: {}", titulo, ex);
-            return CompletableFuture.failedFuture(ex);
-        }
-    }
-
+    /**
+     * Grounded in {@code teoriaTexto} (the theory already generated/stored for this
+     * topic), never the raw syllabus source: {@link Katedra.Server.service.ContenidoTemarioService}
+     * guarantees theory exists before dispatching this call.
+     */
     @Async
     public CompletableFuture<List<EvaluacionPreguntaDTO>> generarEvaluacion(
-            String asignatura, String titulo, String gradoAcademico, String fuente, ModeloIA modelo) {
+            String asignatura, String titulo, NivelAcademico nivel, String teoriaTexto, ModeloIA modelo) {
         try {
-            log.info("Generando evaluación [{}] para tema: {}", modelo.getDisplayName(), titulo);
+            log.info("Generando evaluación [{}] para tema: {} (nivel {})", modelo.getDisplayName(), titulo, nivel.getEtiqueta());
             List<EvaluacionPreguntaDTO> preguntas = chatClient.prompt()
-                    .system(PromptTemplates.EVALUACION_SYSTEM_PROMPT)
-                    .user(PromptTemplates.buildUserPrompt(asignatura, titulo, gradoAcademico, fuente))
+                    .system(PromptTemplates.buildEvaluacionSystemPrompt(modelo, nivel))
+                    .user(PromptTemplates.buildUserPrompt(asignatura, titulo, nivel.getEtiqueta(), teoriaTexto))
                     .options(buildOptions(modelo))
                     .call()
                     .entity(new ParameterizedTypeReference<List<EvaluacionPreguntaDTO>>() {});
@@ -104,15 +91,20 @@ public class AiContentGeneratorService {
         }
     }
 
+    /**
+     * Grounded in {@code teoriaTexto} (the theory already generated/stored for this
+     * topic), never the raw syllabus source: {@link Katedra.Server.service.ContenidoTemarioService}
+     * guarantees theory exists before dispatching this call.
+     */
     @Async
     public CompletableFuture<List<DiapositivaDTO>> generarDiapositivas(
-            String asignatura, String titulo, String gradoAcademico, String fuente, ModeloIA modelo,
+            String asignatura, String titulo, String gradoAcademico, String teoriaTexto, ModeloIA modelo,
             int numeroDiapositivas) {
         try {
             log.info("Generando {} diapositivas [{}] para tema: {}", numeroDiapositivas, modelo.getDisplayName(), titulo);
             List<DiapositivaDTO> diapositivas = chatClient.prompt()
                     .system(PromptTemplates.buildDiapositivasSystemPrompt(numeroDiapositivas))
-                    .user(PromptTemplates.buildUserPrompt(asignatura, titulo, gradoAcademico, fuente))
+                    .user(PromptTemplates.buildUserPrompt(asignatura, titulo, gradoAcademico, teoriaTexto))
                     .options(buildOptions(modelo))
                     .call()
                     .entity(new ParameterizedTypeReference<List<DiapositivaDTO>>() {});

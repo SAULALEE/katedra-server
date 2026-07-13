@@ -27,9 +27,7 @@ public final class PromptTemplates {
 
     private static final String KATEDRA_CONTEXT = readResource("context.st");
 
-    public static final String EJERCICIOS_SYSTEM_PROMPT = readResource("ejercicios-system.st");
-
-    public static final String EVALUACION_SYSTEM_PROMPT = readResource("evaluacion-system.st");
+    private static final PromptTemplate EVALUACION_SYSTEM_TEMPLATE = loadTemplate("evaluacion-system.st");
 
     private static final PromptTemplate TEORIA_SYSTEM_TEMPLATE = loadTemplate("teoria-system.st");
 
@@ -42,27 +40,39 @@ public final class PromptTemplates {
                 "katedraContext", KATEDRA_CONTEXT,
                 "nivelRubrica", nivel.getRubrica(),
                 "estiloTeoria", modelo.getEstiloTeoria(),
-                "parrafosInstruccion", buildParrafosInstruccion(modelo)));
+                "parrafosInstruccion", buildCantidadInstruccion(
+                        modelo.getMinParrafosTeoria(), modelo.getMaxParrafosTeoria(), "párrafos")));
+    }
+
+    public static String buildEvaluacionSystemPrompt(ModeloIA modelo, NivelAcademico nivel) {
+        return EVALUACION_SYSTEM_TEMPLATE.render(Map.of(
+                "katedraContext", KATEDRA_CONTEXT,
+                "nivelRubrica", nivel.getRubrica(),
+                "estiloEvaluacion", modelo.getEstiloEvaluacion(),
+                "cantidadInstruccion", buildCantidadInstruccion(
+                        modelo.getMinPreguntas(), modelo.getMaxPreguntas(), "preguntas")));
     }
 
     /**
-     * Renders the exact wording for the paragraph-count instruction in Java rather
-     * than in the .st template, since the phrasing branches on whether the tier has
-     * a fixed count (min == max) or a range (e.g. Catedrático's 8-10).
+     * Renders the exact wording for a count instruction (paragraphs, exercises,
+     * questions) in Java rather than in each .st template, since the phrasing branches
+     * on whether the tier has a fixed count (min == max) or a range (e.g. Catedrático's
+     * 15-20).
      */
-    private static String buildParrafosInstruccion(ModeloIA modelo) {
-        int min = modelo.getMinParrafosTeoria();
-        int max = modelo.getMaxParrafosTeoria();
+    private static String buildCantidadInstruccion(int min, int max, String sustantivo) {
         if (min == max) {
-            return "Redacta exactamente " + min + " párrafos en total.";
+            return "Genera exactamente " + min + " " + sustantivo + " en total.";
         }
-        return "Redacta entre " + min + " y " + max + " párrafos en total, distribuidos "
-                + "según la amplitud real del tema (temas simples cerca del mínimo, "
-                + "temas amplios cerca del máximo).";
+        return "Genera entre " + min + " y " + max + " " + sustantivo + " en total, elige la "
+                + "cantidad según la amplitud real del tema (temas simples cerca del mínimo, "
+                + "temas amplios cerca del máximo) — nunca sacrifiques la calidad por alcanzar "
+                + "el máximo.";
     }
 
     public static String buildDiapositivasSystemPrompt(int numeroDiapositivas) {
-        return DIAPOSITIVAS_SYSTEM_TEMPLATE.render(Map.of("numeroDiapositivas", numeroDiapositivas));
+        return DIAPOSITIVAS_SYSTEM_TEMPLATE.render(Map.of(
+                "katedraContext", KATEDRA_CONTEXT,
+                "numeroDiapositivas", numeroDiapositivas));
     }
 
     public static String buildUserPrompt(String asignatura, String titulo, String gradoAcademico, String fuente) {

@@ -139,7 +139,7 @@ class TemarioControllerTest {
     @Test
     void shouldGetContenidoByTemarioId() throws Exception {
         var contenidoResponse = new Katedra.Server.dto.ContenidoTemarioResponseDTO(
-                "contenido-uuid-789", "temario-uuid-123", "## Teoría", "## Ejercicios",
+                "contenido-uuid-789", "temario-uuid-123", "## Teoría",
                 List.of(), List.of(), "flash", Map.of());
         given(contenidoTemarioService.getContenidoByTemarioId("temario-uuid-123", "profesor@katedra.com"))
                 .willReturn(contenidoResponse);
@@ -163,7 +163,7 @@ class TemarioControllerTest {
                 }
                 """;
         var contenidoResponse = new Katedra.Server.dto.ContenidoTemarioResponseDTO(
-                "contenido-uuid-789", "temario-uuid-123", null, null,
+                "contenido-uuid-789", "temario-uuid-123", null,
                 List.of(new Katedra.Server.dto.EvaluacionPreguntaDTO(
                         "¿Pregunta?", List.of("A", "B", "C", "D"), 0, "Explicación")),
                 null, "flash", Map.of());

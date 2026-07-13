@@ -79,32 +79,39 @@ class PromptTemplatesTest {
     }
 
     @Test
-    void shouldContainLabeledDifficultyTiersInEjerciciosPrompt() {
-        String prompt = PromptTemplates.EJERCICIOS_SYSTEM_PROMPT;
-
-        assertThat(prompt).contains("Ejercicio 1 — Básico");
-        assertThat(prompt).contains("Ejercicio 2 — Intermedio");
-        assertThat(prompt).contains("Ejercicio 3 — Avanzado");
-        assertThat(prompt).contains("Nivel escolar");
-        assertThat(prompt).contains("Pregrado");
-        assertThat(prompt).contains("Posgrado");
-    }
-
-    @Test
     void shouldRequireCognitiveVarietyAndPlausibleDistractorsInEvaluacionPrompt() {
-        String prompt = PromptTemplates.EVALUACION_SYSTEM_PROMPT;
+        String prompt = PromptTemplates.buildEvaluacionSystemPrompt(ModeloIA.FLASH, NivelAcademico.UNIVERSITARIO);
 
-        assertThat(prompt).contains("exactamente 3");
-        assertThat(prompt).contains("recordar o comprender");
-        assertThat(prompt).contains("aplicar");
-        assertThat(prompt).contains("analizar");
+        assertThat(prompt).contains(ModeloIA.FLASH.getMinPreguntas() + " y " + ModeloIA.FLASH.getMaxPreguntas());
+        assertThat(prompt).containsIgnoringCase("recordar o comprender");
+        assertThat(prompt).containsIgnoringCase("aplicar");
+        assertThat(prompt).containsIgnoringCase("analizar");
         assertThat(prompt).contains("distractores");
         assertThat(prompt).contains("todas las anteriores");
     }
 
     @Test
+    void shouldEmbedTierQuestionCountInEvaluacionPrompt() {
+        String catedratico = PromptTemplates.buildEvaluacionSystemPrompt(ModeloIA.MAX, NivelAcademico.UNIVERSITARIO);
+
+        assertThat(catedratico).contains(ModeloIA.MAX.getMinPreguntas() + " y " + ModeloIA.MAX.getMaxPreguntas());
+    }
+
+    @Test
+    void shouldEmbedDistinctTierStyleInEvaluacionPrompt() {
+        String tutor = PromptTemplates.buildEvaluacionSystemPrompt(ModeloIA.FLASH, NivelAcademico.UNIVERSITARIO);
+        String maestro = PromptTemplates.buildEvaluacionSystemPrompt(ModeloIA.PRO, NivelAcademico.UNIVERSITARIO);
+        String catedratico = PromptTemplates.buildEvaluacionSystemPrompt(ModeloIA.MAX, NivelAcademico.UNIVERSITARIO);
+
+        assertThat(tutor).contains(ModeloIA.FLASH.getEstiloEvaluacion());
+        assertThat(maestro).contains(ModeloIA.PRO.getEstiloEvaluacion());
+        assertThat(catedratico).contains(ModeloIA.MAX.getEstiloEvaluacion());
+        assertThat(tutor).isNotEqualTo(maestro).isNotEqualTo(catedratico);
+    }
+
+    @Test
     void shouldNotMentionFormatOrJsonInEvaluacionPrompt() {
-        String prompt = PromptTemplates.EVALUACION_SYSTEM_PROMPT;
+        String prompt = PromptTemplates.buildEvaluacionSystemPrompt(ModeloIA.PRO, NivelAcademico.UNIVERSITARIO);
 
         assertThat(prompt).doesNotContainIgnoringCase("json");
         assertThat(prompt).doesNotContain("```");
@@ -118,6 +125,15 @@ class PromptTemplatesTest {
         assertThat(prompt).contains("Nivel escolar");
         assertThat(prompt).contains("Pregrado");
         assertThat(prompt).contains("Posgrado");
+    }
+
+    @Test
+    void shouldRequireCoverSlideAndTheoryGroundingInDiapositivasPrompt() {
+        String prompt = PromptTemplates.buildDiapositivasSystemPrompt(8);
+
+        assertThat(prompt).containsIgnoringCase("portada");
+        assertThat(prompt).contains("teoría ya generada");
+        assertThat(prompt).containsIgnoringCase("Katedra");
     }
 
     @Test

@@ -26,9 +26,6 @@ public class ContenidoTemario {
     @Column(name = "teoria", columnDefinition = "LONGTEXT")
     private String teoria;
 
-    @Column(name = "ejercicios", columnDefinition = "LONGTEXT")
-    private String ejercicios;
-
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "evaluacion", columnDefinition = "json")
     private List<EvaluacionPreguntaDTO> evaluacion;
@@ -60,9 +57,6 @@ public class ContenidoTemario {
 
     public String getTeoria() { return teoria; }
     public void setTeoria(String teoria) { this.teoria = teoria; }
-
-    public String getEjercicios() { return ejercicios; }
-    public void setEjercicios(String ejercicios) { this.ejercicios = ejercicios; }
 
     public List<EvaluacionPreguntaDTO> getEvaluacion() { return evaluacion; }
     public void setEvaluacion(List<EvaluacionPreguntaDTO> evaluacion) { this.evaluacion = evaluacion; }
