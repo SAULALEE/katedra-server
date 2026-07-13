@@ -2,11 +2,19 @@ package Katedra.Server.service;
 
 import Katedra.Server.dto.TemarioRequestDTO;
 import Katedra.Server.dto.TemarioResponseDTO;
+import Katedra.Server.dto.TemarioUploadResponseDTO;
+import Katedra.Server.dto.TemarioDriveRequestDTO;
+import Katedra.Server.dto.TemarioUrlRequestDTO;
+import Katedra.Server.model.ContenidoTemario;
+import Katedra.Server.model.NivelAcademico;
 import Katedra.Server.model.Temario;
 import Katedra.Server.model.Usuario;
+import Katedra.Server.repository.ContenidoTemarioRepository;
 import Katedra.Server.repository.TemarioRepository;
 import Katedra.Server.repository.UsuarioRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -16,10 +24,24 @@ public class TemarioService {
 
     private final TemarioRepository temarioRepository;
     private final UsuarioRepository usuarioRepository;
+    private final ContenidoTemarioRepository contenidoTemarioRepository;
+    private final TemarioFileExtractionService temarioFileExtractionService;
+    private final TemarioUrlExtractionService temarioUrlExtractionService;
+    private final TemarioGoogleDriveDownloadService temarioGoogleDriveDownloadService;
 
-    public TemarioService(TemarioRepository temarioRepository, UsuarioRepository usuarioRepository) {
+    public TemarioService(
+            TemarioRepository temarioRepository,
+            UsuarioRepository usuarioRepository,
+            ContenidoTemarioRepository contenidoTemarioRepository,
+            TemarioFileExtractionService temarioFileExtractionService,
+            TemarioUrlExtractionService temarioUrlExtractionService,
+            TemarioGoogleDriveDownloadService temarioGoogleDriveDownloadService) {
         this.temarioRepository = temarioRepository;
         this.usuarioRepository = usuarioRepository;
+        this.contenidoTemarioRepository = contenidoTemarioRepository;
+        this.temarioFileExtractionService = temarioFileExtractionService;
+        this.temarioUrlExtractionService = temarioUrlExtractionService;
+        this.temarioGoogleDriveDownloadService = temarioGoogleDriveDownloadService;
     }
 
     public TemarioResponseDTO createTemario(String userEmail, TemarioRequestDTO request) {
@@ -36,6 +58,102 @@ public class TemarioService {
 
         Temario saved = temarioRepository.save(temario);
         return mapToDTO(saved);
+    }
+
+    @Transactional
+    public TemarioUploadResponseDTO cargarTemarioArchivo(
+            String userEmail,
+            MultipartFile file,
+            String titulo,
+            String asignatura,
+            String gradoAcademico) {
+        Usuario usuario = usuarioRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        var extracted = temarioFileExtractionService.extract(file);
+        String resolvedTitulo = resolveTitulo(titulo, extracted.filename());
+
+        Temario temario = new Temario(
+                usuario,
+                resolvedTitulo,
+                "Contenido cargado desde archivo: " + extracted.filename(),
+                NivelAcademico.fromValor(gradoAcademico),
+                asignatura
+        );
+        Temario savedTemario = temarioRepository.save(temario);
+
+        ContenidoTemario contenido = new ContenidoTemario(savedTemario);
+        contenido.setTeoria(extracted.text());
+        ContenidoTemario savedContenido = contenidoTemarioRepository.save(contenido);
+
+        return new TemarioUploadResponseDTO(
+                mapToDTO(savedTemario),
+                savedContenido.getId(),
+                extracted.filename(),
+                extracted.contentType(),
+                null,
+                extracted.text().length()
+        );
+    }
+
+    @Transactional
+    public TemarioUploadResponseDTO cargarTemarioUrl(String userEmail, TemarioUrlRequestDTO request) {
+        Usuario usuario = usuarioRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        var extracted = temarioUrlExtractionService.extract(request.url());
+        String resolvedTitulo = resolveTitulo(request.titulo(), extracted.title());
+
+        Temario temario = new Temario(
+                usuario,
+                resolvedTitulo,
+                "Contenido cargado desde URL: " + extracted.url(),
+                NivelAcademico.fromValor(request.gradoAcademico()),
+                request.asignatura()
+        );
+        Temario savedTemario = temarioRepository.save(temario);
+
+        ContenidoTemario contenido = new ContenidoTemario(savedTemario);
+        contenido.setTeoria(extracted.text());
+        ContenidoTemario savedContenido = contenidoTemarioRepository.save(contenido);
+
+        return new TemarioUploadResponseDTO(
+                mapToDTO(savedTemario),
+                savedContenido.getId(),
+                null,
+                "text/html",
+                extracted.url(),
+                extracted.text().length()
+        );
+    }
+
+    @Transactional
+    public TemarioUploadResponseDTO cargarTemarioDrive(String userEmail, TemarioDriveRequestDTO request) {
+        Usuario usuario = usuarioRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        var downloaded = temarioGoogleDriveDownloadService.download(request.url());
+        var extracted = temarioFileExtractionService.extract(downloaded.file());
+        String resolvedTitulo = resolveTitulo(request.titulo(), extracted.filename());
+
+        Temario temario = new Temario(
+                usuario,
+                resolvedTitulo,
+                "Contenido cargado desde Google Drive: " + downloaded.fileId(),
+                NivelAcademico.fromValor(request.gradoAcademico()),
+                request.asignatura()
+        );
+        Temario savedTemario = temarioRepository.save(temario);
+
+        ContenidoTemario contenido = new ContenidoTemario(savedTemario);
+        contenido.setTeoria(extracted.text());
+        ContenidoTemario savedContenido = contenidoTemarioRepository.save(contenido);
+
+        return new TemarioUploadResponseDTO(
+                mapToDTO(savedTemario),
+                savedContenido.getId(),
+                extracted.filename(),
+                extracted.contentType(),
+                request.url(),
+                extracted.text().length()
+        );
     }
 
     public List<TemarioResponseDTO> getTemariosByUser(String userEmail) {
@@ -80,5 +198,16 @@ public class TemarioService {
                 temario.getCreatedAt(),
                 temario.getUpdatedAt()
         );
+    }
+
+    private String resolveTitulo(String titulo, String filename) {
+        if (titulo != null && !titulo.isBlank()) {
+            return titulo;
+        }
+        int extensionStart = filename.lastIndexOf('.');
+        if (extensionStart > 0) {
+            return filename.substring(0, extensionStart);
+        }
+        return filename;
     }
 }

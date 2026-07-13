@@ -2,6 +2,9 @@ package Katedra.Server.controller;
 
 import Katedra.Server.dto.TemarioRequestDTO;
 import Katedra.Server.dto.TemarioResponseDTO;
+import Katedra.Server.dto.TemarioUploadResponseDTO;
+import Katedra.Server.dto.TemarioDriveRequestDTO;
+import Katedra.Server.dto.TemarioUrlRequestDTO;
 import Katedra.Server.model.NivelAcademico;
 import Katedra.Server.service.ContenidoTemarioService;
 import Katedra.Server.service.TemarioService;
@@ -95,6 +98,102 @@ class TemarioControllerTest {
                 .andExpect(jsonPath("$.descripcion").value("Aprende Java 21"));
 
         verify(temarioService).createTemario(eq("profesor@katedra.com"), any(TemarioRequestDTO.class));
+    }
+
+    @Test
+    void shouldUploadTemarioFile() throws Exception {
+        var file = new org.springframework.mock.web.MockMultipartFile(
+                "file", "temario.md", "text/markdown", "# Temario".getBytes());
+        var uploadResponse = new TemarioUploadResponseDTO(
+                mockResponse, "contenido-uuid-789", "temario.md", "text/markdown", null, 9);
+        given(temarioService.cargarTemarioArchivo(
+                eq("profesor@katedra.com"),
+                any(org.springframework.web.multipart.MultipartFile.class),
+                eq("Curso de Java"),
+                eq("Programacion"),
+                eq("Universidad")))
+                .willReturn(uploadResponse);
+
+        mockMvc.perform(multipart("/temarios/cargar/archivo")
+                        .file(file)
+                        .param("titulo", "Curso de Java")
+                        .param("asignatura", "Programacion")
+                        .param("gradoAcademico", "Universidad")
+                        .principal(mockPrincipal))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.temario.id").value("temario-uuid-123"))
+                .andExpect(jsonPath("$.contenidoId").value("contenido-uuid-789"))
+                .andExpect(jsonPath("$.archivoNombre").value("temario.md"));
+
+        verify(temarioService).cargarTemarioArchivo(
+                eq("profesor@katedra.com"),
+                any(org.springframework.web.multipart.MultipartFile.class),
+                eq("Curso de Java"),
+                eq("Programacion"),
+                eq("Universidad"));
+    }
+
+    @Test
+    void shouldUploadTemarioUrl() throws Exception {
+        String jsonRequest = """
+                {
+                    "url": "https://example.com/temario",
+                    "titulo": "Curso Web",
+                    "asignatura": "Programacion",
+                    "gradoAcademico": "Universidad"
+                }
+                """;
+        var uploadResponse = new TemarioUploadResponseDTO(
+                mockResponse, "contenido-uuid-790", null, "text/html", "https://example.com/temario", 120);
+        given(temarioService.cargarTemarioUrl(
+                eq("profesor@katedra.com"),
+                any(TemarioUrlRequestDTO.class)))
+                .willReturn(uploadResponse);
+
+        mockMvc.perform(post("/temarios/cargar/url")
+                        .principal(mockPrincipal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonRequest))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.temario.id").value("temario-uuid-123"))
+                .andExpect(jsonPath("$.contenidoId").value("contenido-uuid-790"))
+                .andExpect(jsonPath("$.fuenteUrl").value("https://example.com/temario"));
+
+        verify(temarioService).cargarTemarioUrl(
+                eq("profesor@katedra.com"),
+                any(TemarioUrlRequestDTO.class));
+    }
+
+    @Test
+    void shouldUploadTemarioDrive() throws Exception {
+        String jsonRequest = """
+                {
+                    "url": "https://drive.google.com/file/d/file-123/view",
+                    "titulo": "Curso Drive",
+                    "asignatura": "Programacion",
+                    "gradoAcademico": "Universidad"
+                }
+                """;
+        var uploadResponse = new TemarioUploadResponseDTO(
+                mockResponse, "contenido-uuid-791", "drive-temario.md", "text/markdown",
+                "https://drive.google.com/file/d/file-123/view", 120);
+        given(temarioService.cargarTemarioDrive(
+                eq("profesor@katedra.com"),
+                any(TemarioDriveRequestDTO.class)))
+                .willReturn(uploadResponse);
+
+        mockMvc.perform(post("/temarios/cargar/drive")
+                        .principal(mockPrincipal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonRequest))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.temario.id").value("temario-uuid-123"))
+                .andExpect(jsonPath("$.contenidoId").value("contenido-uuid-791"))
+                .andExpect(jsonPath("$.archivoNombre").value("drive-temario.md"));
+
+        verify(temarioService).cargarTemarioDrive(
+                eq("profesor@katedra.com"),
+                any(TemarioDriveRequestDTO.class));
     }
 
     @Test
