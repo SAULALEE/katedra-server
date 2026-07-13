@@ -22,6 +22,7 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 @Service
@@ -70,12 +71,32 @@ public class ContenidoTemarioService {
 
         ModeloIA modeloTier = request.modelo() != null ? request.modelo() : ModeloIA.FLASH;
         int numeroDiapositivas = resolverNumeroDiapositivas(modeloTier, request);
-        // Source text for the prompts; once PDF/web ingestion lands this prefers temario source content.
+        // Source text for teoría; once PDF/web ingestion lands this prefers temario
+        // source content.
         String fuente = temario.getDescripcion();
 
+        Set<PiezaMaterial> piezas = request.piezas();
+        boolean generaTeoriaAhora = piezas.contains(PiezaMaterial.TEORIA);
+        boolean requiereTeoriaExistente = piezas.contains(PiezaMaterial.EVALUACION)
+                || piezas.contains(PiezaMaterial.DIAPOSITIVAS);
+        String teoriaGuardada = contenido.getTeoria();
+        if (requiereTeoriaExistente && !generaTeoriaAhora
+                && (teoriaGuardada == null || teoriaGuardada.isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Genera la teoría primero antes de generar evaluación o diapositivas");
+        }
+
+        // Evaluación/diapositivas are grounded in the theory text, never the raw syllabus
+        // source: if teoría is part of this same request it must finish first so its
+        // output can be reused; otherwise the already-persisted theory is reused as-is.
+        CompletableFuture<String> teoriaFuture = generaTeoriaAhora
+                ? aiContentGeneratorService.generarTeoria(
+                        temario.getAsignatura(), temario.getTitulo(), temario.getGradoAcademico(), fuente, modeloTier)
+                : CompletableFuture.completedFuture(teoriaGuardada);
+
         Map<PiezaMaterial, CompletableFuture<?>> futures = new EnumMap<>(PiezaMaterial.class);
-        for (PiezaMaterial pieza : request.piezas()) {
-            futures.put(pieza, dispatch(pieza, temario, fuente, modeloTier, numeroDiapositivas));
+        for (PiezaMaterial pieza : piezas) {
+            futures.put(pieza, dispatch(pieza, temario, teoriaFuture, modeloTier, numeroDiapositivas));
         }
 
         // Each failure is caught individually so one failed piece (e.g. an OpenAI
@@ -143,17 +164,24 @@ public class ContenidoTemarioService {
         return solicitado;
     }
 
+    /**
+     * Dispatches a single piece. EVALUACION/DIAPOSITIVAS chain off {@code teoriaFuture}
+     * so they always run after (and are grounded in) the theory text, whether it was
+     * just generated in this same request or already persisted.
+     */
     private CompletableFuture<?> dispatch(
-            PiezaMaterial pieza, Temario temario, String fuente, ModeloIA modeloTier, int numeroDiapositivas) {
+            PiezaMaterial pieza, Temario temario, CompletableFuture<String> teoriaFuture,
+            ModeloIA modeloTier, int numeroDiapositivas) {
         String asignatura = temario.getAsignatura();
         String titulo = temario.getTitulo();
         NivelAcademico nivel = temario.getGradoAcademico();
         String grado = nivel.getEtiqueta();
         return switch (pieza) {
-            case TEORIA -> aiContentGeneratorService.generarTeoria(asignatura, titulo, nivel, fuente, modeloTier);
-            case EJERCICIOS -> aiContentGeneratorService.generarEjercicios(asignatura, titulo, grado, fuente, modeloTier);
-            case EVALUACION -> aiContentGeneratorService.generarEvaluacion(asignatura, titulo, grado, fuente, modeloTier);
-            case DIAPOSITIVAS -> aiContentGeneratorService.generarDiapositivas(asignatura, titulo, grado, fuente, modeloTier, numeroDiapositivas);
+            case TEORIA -> teoriaFuture;
+            case EVALUACION -> teoriaFuture.thenCompose(teoriaTexto ->
+                    aiContentGeneratorService.generarEvaluacion(asignatura, titulo, nivel, teoriaTexto, modeloTier));
+            case DIAPOSITIVAS -> teoriaFuture.thenCompose(teoriaTexto ->
+                    aiContentGeneratorService.generarDiapositivas(asignatura, titulo, grado, teoriaTexto, modeloTier, numeroDiapositivas));
         };
     }
 
@@ -161,7 +189,6 @@ public class ContenidoTemarioService {
     private void aplicarResultado(ContenidoTemario contenido, PiezaMaterial pieza, Object resultado) {
         switch (pieza) {
             case TEORIA -> contenido.setTeoria((String) resultado);
-            case EJERCICIOS -> contenido.setEjercicios((String) resultado);
             case EVALUACION -> contenido.setEvaluacion((List<EvaluacionPreguntaDTO>) resultado);
             case DIAPOSITIVAS -> contenido.setDiapositivas((List<DiapositivaDTO>) resultado);
         }
@@ -174,7 +201,6 @@ public class ContenidoTemarioService {
                 entity.getId(),
                 entity.getTemario().getId(),
                 entity.getTeoria(),
-                entity.getEjercicios(),
                 entity.getEvaluacion(),
                 entity.getDiapositivas(),
                 entity.getModelo(),

@@ -4,12 +4,11 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 /**
- * The four kinds of educational material that can be generated for a syllabus.
+ * The three kinds of educational material that can be generated for a syllabus.
  * JSON values are lowercase Spanish to match the frontend contract.
  */
 public enum PiezaMaterial {
     TEORIA("teoria"),
-    EJERCICIOS("ejercicios"),
     EVALUACION("evaluacion"),
     DIAPOSITIVAS("diapositivas");
 

@@ -14,7 +14,6 @@ public record ContenidoTemarioResponseDTO(
     String id,
     String temarioId,
     String teoria,
-    String ejercicios,
     List<EvaluacionPreguntaDTO> evaluacion,
     List<DiapositivaDTO> diapositivas,
     String modelo,
