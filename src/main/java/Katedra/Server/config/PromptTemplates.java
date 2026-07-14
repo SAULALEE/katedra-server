@@ -1,5 +1,6 @@
 package Katedra.Server.config;
 
+import Katedra.Server.model.AssistantQuickAction;
 import Katedra.Server.model.ModeloIA;
 import Katedra.Server.model.NivelAcademico;
 import org.springframework.ai.chat.prompt.PromptTemplate;
@@ -35,6 +36,10 @@ public final class PromptTemplates {
 
     private static final PromptTemplate USER_PROMPT_TEMPLATE = loadTemplate("user-prompt.st");
 
+    private static final PromptTemplate CORRECCION_SYSTEM_TEMPLATE = loadTemplate("correccion-system.st");
+
+    private static final PromptTemplate CORRECCION_USER_TEMPLATE = loadTemplate("correccion-user.st");
+
     public static String buildTeoriaSystemPrompt(ModeloIA modelo, NivelAcademico nivel) {
         return TEORIA_SYSTEM_TEMPLATE.render(Map.of(
                 "katedraContext", KATEDRA_CONTEXT,
@@ -67,6 +72,36 @@ public final class PromptTemplates {
                 + "cantidad según la amplitud real del tema (temas simples cerca del mínimo, "
                 + "temas amplios cerca del máximo) — nunca sacrifiques la calidad por alcanzar "
                 + "el máximo.";
+    }
+
+    /**
+     * System prompt for the theory-correction assistant: the model may only edit the
+     * supplied theory (keeping the student's academic register) and must refuse anything else.
+     */
+    public static String buildCorreccionSystemPrompt(NivelAcademico nivel) {
+        return CORRECCION_SYSTEM_TEMPLATE.render(Map.of(
+                "katedraContext", KATEDRA_CONTEXT,
+                "nivelRubrica", nivel.getRubrica()));
+    }
+
+    /**
+     * User prompt for a correction request: resolves the {@code action} to its canned
+     * instruction and appends the free-form {@code message} (for {@link AssistantQuickAction#FREE_CHAT}
+     * the message IS the instruction), then injects the current theory to edit.
+     */
+    public static String buildCorreccionUserPrompt(String teoriaActual, AssistantQuickAction action, String message) {
+        return CORRECCION_USER_TEMPLATE.render(Map.of(
+                "instruccion", buildCorreccionInstruccion(action, message),
+                "teoriaActual", teoriaActual));
+    }
+
+    private static String buildCorreccionInstruccion(AssistantQuickAction action, String message) {
+        String base = action.getInstruccion();
+        String extra = (message == null) ? "" : message.strip();
+        if (base == null) {
+            return extra;
+        }
+        return extra.isEmpty() ? base : base + " " + extra;
     }
 
     public static String buildDiapositivasSystemPrompt(int numeroDiapositivas) {

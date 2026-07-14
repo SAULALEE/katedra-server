@@ -1,5 +1,6 @@
 package Katedra.Server.service;
 
+import Katedra.Server.config.OpenAiOptionsFactory;
 import Katedra.Server.config.PromptTemplates;
 import Katedra.Server.dto.DiapositivaDTO;
 import Katedra.Server.dto.EvaluacionPreguntaDTO;
@@ -8,7 +9,6 @@ import Katedra.Server.model.NivelAcademico;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -33,23 +33,6 @@ public class AiContentGeneratorService {
         this.chatClient = chatClientBuilder.build();
     }
 
-    /**
-     * Builds call options for the given tier. Reasoning-style models (o-series, GPT-5
-     * family) reject {@code temperature} and require {@code max_completion_tokens}
-     * instead of {@code max_tokens}, since it also covers hidden reasoning tokens.
-     */
-    private OpenAiChatOptions.Builder buildOptions(ModeloIA modelo) {
-        OpenAiChatOptions.Builder options = OpenAiChatOptions.builder().model(modelo.getModelId());
-        if (modelo.isReasoning()) {
-            options.reasoningEffort(modelo.getReasoningEffort())
-                    .maxCompletionTokens(modelo.getMaxTokens());
-        } else {
-            options.temperature(modelo.getTemperature())
-                    .maxTokens(modelo.getMaxTokens());
-        }
-        return options;
-    }
-
     @Async
     public CompletableFuture<String> generarTeoria(
             String asignatura, String titulo, NivelAcademico nivel, String fuente, ModeloIA modelo) {
@@ -58,7 +41,7 @@ public class AiContentGeneratorService {
             String texto = chatClient.prompt()
                     .system(PromptTemplates.buildTeoriaSystemPrompt(modelo, nivel))
                     .user(PromptTemplates.buildUserPrompt(asignatura, titulo, nivel.getEtiqueta(), fuente))
-                    .options(buildOptions(modelo))
+                    .options(OpenAiOptionsFactory.forModelo(modelo))
                     .call()
                     .content();
             return CompletableFuture.completedFuture(texto);
@@ -81,7 +64,7 @@ public class AiContentGeneratorService {
             List<EvaluacionPreguntaDTO> preguntas = chatClient.prompt()
                     .system(PromptTemplates.buildEvaluacionSystemPrompt(modelo, nivel))
                     .user(PromptTemplates.buildUserPrompt(asignatura, titulo, nivel.getEtiqueta(), teoriaTexto))
-                    .options(buildOptions(modelo))
+                    .options(OpenAiOptionsFactory.forModelo(modelo))
                     .call()
                     .entity(new ParameterizedTypeReference<List<EvaluacionPreguntaDTO>>() {});
             return CompletableFuture.completedFuture(preguntas);
@@ -105,7 +88,7 @@ public class AiContentGeneratorService {
             List<DiapositivaDTO> diapositivas = chatClient.prompt()
                     .system(PromptTemplates.buildDiapositivasSystemPrompt(numeroDiapositivas))
                     .user(PromptTemplates.buildUserPrompt(asignatura, titulo, gradoAcademico, teoriaTexto))
-                    .options(buildOptions(modelo))
+                    .options(OpenAiOptionsFactory.forModelo(modelo))
                     .call()
                     .entity(new ParameterizedTypeReference<List<DiapositivaDTO>>() {});
             return CompletableFuture.completedFuture(diapositivas);

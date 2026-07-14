@@ -135,6 +135,25 @@ public class ContenidoTemarioService {
                 });
     }
 
+    /**
+     * Fetches the generated content of an owned syllabus (ownership enforced), 404 if the
+     * syllabus has no content yet. Shared with the correction assistant so ownership logic
+     * lives in one place.
+     */
+    @Transactional(readOnly = true)
+    public ContenidoTemario getContenidoOwned(String temarioId, String userEmail) {
+        findOwnedTemario(temarioId, userEmail);
+        return contenidoTemarioRepository.findByTemarioId(temarioId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contenido no generado. Use POST /generar-material"));
+    }
+
+    /** Overwrites the theory text of an existing content row and persists it. */
+    @Transactional
+    public void guardarTeoria(ContenidoTemario contenido, String nuevaTeoria) {
+        contenido.setTeoria(nuevaTeoria);
+        contenidoTemarioRepository.save(contenido);
+    }
+
     private Temario findOwnedTemario(String temarioId, String userEmail) {
         Temario temario = temarioRepository.findById(temarioId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Temario no encontrado"));
