@@ -11,6 +11,22 @@ import com.fasterxml.jackson.annotation.JsonValue;
  * on cheaper tiers.
  */
 public enum ModeloIA {
+    BASICO(
+            "basico", "Básico", "gpt-4o-mini",
+            8, 8, 8,
+            3, 5,
+            3, 5,
+            0.5, 2500, false, null,
+            "Estilo BÁSICO: explicación clara, directa y completa, sin profundidad innecesaria.",
+            "Estilo BÁSICO: preguntas esenciales con explicaciones breves y completas."),
+    AVANZADO(
+            "avanzado", "Avanzado", "gpt-4o",
+            15, 15, 15,
+            5, 8,
+            5, 7,
+            0.5, 6000, false, null,
+            "Estilo AVANZADO: desarrollo razonado, analítico y profundo, con ejemplos paso a paso.",
+            "Estilo AVANZADO: preguntas contextualizadas que exigen aplicación y análisis."),
     FLASH(
             "flash", "Tutor", "gpt-4.1-mini",
             8, 8, 8,
@@ -225,8 +241,14 @@ public enum ModeloIA {
 
     @JsonCreator
     public static ModeloIA fromValor(String valor) {
+        if ("flash".equalsIgnoreCase(valor) || "tutor".equalsIgnoreCase(valor)) {
+            return BASICO;
+        }
+        if ("pro".equalsIgnoreCase(valor) || "maestro".equalsIgnoreCase(valor)) {
+            return AVANZADO;
+        }
         for (ModeloIA modelo : values()) {
-            if (modelo.valor.equalsIgnoreCase(valor)) {
+            if (modelo.valor.equalsIgnoreCase(valor) || modelo.modelId.equalsIgnoreCase(valor)) {
                 return modelo;
             }
         }

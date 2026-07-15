@@ -5,8 +5,8 @@ import Katedra.Server.dto.TemarioResponseDTO;
 import Katedra.Server.dto.TemarioUploadResponseDTO;
 import Katedra.Server.dto.TemarioDriveRequestDTO;
 import Katedra.Server.dto.TemarioUrlRequestDTO;
+import Katedra.Server.dto.TemarioStatsResponseDTO;
 import Katedra.Server.model.ContenidoTemario;
-import Katedra.Server.model.NivelAcademico;
 import Katedra.Server.model.Temario;
 import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.ContenidoTemarioRepository;
@@ -44,6 +44,7 @@ public class TemarioService {
         this.temarioGoogleDriveDownloadService = temarioGoogleDriveDownloadService;
     }
 
+    @Transactional
     public TemarioResponseDTO createTemario(String userEmail, TemarioRequestDTO request) {
         Usuario usuario = usuarioRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
@@ -57,7 +58,24 @@ public class TemarioService {
         );
 
         Temario saved = temarioRepository.save(temario);
+        contenidoTemarioRepository.save(new ContenidoTemario(saved));
         return mapToDTO(saved);
+    }
+
+    @Transactional
+    public TemarioResponseDTO updateTemario(String id, String userEmail, TemarioRequestDTO request) {
+        Temario temario = temarioRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Temario no encontrado"));
+        if (!temario.getUsuario().getEmail().equals(userEmail)) {
+            throw new RuntimeException("Acceso denegado a este temario");
+        }
+
+        temario.setTitulo(request.titulo());
+        temario.setDescripcion(request.descripcion());
+        temario.setGradoAcademico(request.gradoAcademico());
+        temario.setAsignatura(request.asignatura());
+        temario.setUpdatedAt(java.time.LocalDateTime.now());
+        return mapToDTO(temarioRepository.save(temario));
     }
 
     @Transactional
@@ -76,7 +94,7 @@ public class TemarioService {
                 usuario,
                 resolvedTitulo,
                 "Contenido cargado desde archivo: " + extracted.filename(),
-                NivelAcademico.fromValor(gradoAcademico),
+                gradoAcademico,
                 asignatura
         );
         Temario savedTemario = temarioRepository.save(temario);
@@ -106,7 +124,7 @@ public class TemarioService {
                 usuario,
                 resolvedTitulo,
                 "Contenido cargado desde URL: " + extracted.url(),
-                NivelAcademico.fromValor(request.gradoAcademico()),
+                request.gradoAcademico(),
                 request.asignatura()
         );
         Temario savedTemario = temarioRepository.save(temario);
@@ -137,7 +155,7 @@ public class TemarioService {
                 usuario,
                 resolvedTitulo,
                 "Contenido cargado desde Google Drive: " + downloaded.fileId(),
-                NivelAcademico.fromValor(request.gradoAcademico()),
+                request.gradoAcademico(),
                 request.asignatura()
         );
         Temario savedTemario = temarioRepository.save(temario);
@@ -177,6 +195,7 @@ public class TemarioService {
         return mapToDTO(temario);
     }
 
+    @Transactional
     public void deleteTemario(String id, String userEmail) {
         Temario temario = temarioRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Temario no encontrado"));
@@ -185,7 +204,15 @@ public class TemarioService {
             throw new RuntimeException("Acceso denegado a este temario");
         }
 
+        contenidoTemarioRepository.findByTemarioId(id).ifPresent(contenidoTemarioRepository::delete);
         temarioRepository.delete(temario);
+    }
+
+    @Transactional(readOnly = true)
+    public TemarioStatsResponseDTO getEstadisticas(String userEmail) {
+        Usuario usuario = usuarioRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        return new TemarioStatsResponseDTO(usuario.getAiGenerationCount());
     }
 
     private TemarioResponseDTO mapToDTO(Temario temario) {

@@ -68,7 +68,7 @@ class TemarioControllerTest {
                 "temario-uuid-123",
                 "Curso de Java",
                 "Aprende Java 21",
-                NivelAcademico.UNIVERSITARIO,
+                "universitario",
                 "Programacion",
                 LocalDateTime.now(),
                 LocalDateTime.now()
@@ -96,6 +96,28 @@ class TemarioControllerTest {
                 .andExpect(jsonPath("$.id").value("temario-uuid-123"))
                 .andExpect(jsonPath("$.titulo").value("Curso de Java"))
                 .andExpect(jsonPath("$.descripcion").value("Aprende Java 21"));
+
+        verify(temarioService).createTemario(eq("profesor@katedra.com"), any(TemarioRequestDTO.class));
+    }
+
+    @Test
+    void shouldAcceptCommaSeparatedAcademicGradesForManualTemario() throws Exception {
+        String jsonRequest = """
+                {
+                    "titulo": "Curso multidisciplinario",
+                    "descripcion": "Contenido manual",
+                    "gradoAcademico": "Primaria, Universidad, Diplomado de programacion",
+                    "asignatura": "Programacion"
+                }
+                """;
+        given(temarioService.createTemario(eq("profesor@katedra.com"), any(TemarioRequestDTO.class)))
+                .willReturn(mockResponse);
+
+        mockMvc.perform(post("/temarios")
+                        .principal(mockPrincipal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonRequest))
+                .andExpect(status().isCreated());
 
         verify(temarioService).createTemario(eq("profesor@katedra.com"), any(TemarioRequestDTO.class));
     }
@@ -233,6 +255,31 @@ class TemarioControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(temarioService).deleteTemario("temario-uuid-123", "profesor@katedra.com");
+    }
+
+    @Test
+    void shouldUpdateTemario() throws Exception {
+        given(temarioService.updateTemario(eq("temario-uuid-123"), eq("profesor@katedra.com"), any(TemarioRequestDTO.class)))
+                .willReturn(mockResponse);
+
+        mockMvc.perform(put("/temarios/temario-uuid-123")
+                        .principal(mockPrincipal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"titulo":"Curso de Java","descripcion":"Actualizado","gradoAcademico":"Universidad","asignatura":"Programación"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("temario-uuid-123"));
+    }
+
+    @Test
+    void shouldGetTemarioStatistics() throws Exception {
+        given(temarioService.getEstadisticas("profesor@katedra.com"))
+                .willReturn(new Katedra.Server.dto.TemarioStatsResponseDTO(7));
+
+        mockMvc.perform(get("/temarios/estadisticas").principal(mockPrincipal))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.llamadasIA").value(7));
     }
 
     @Test

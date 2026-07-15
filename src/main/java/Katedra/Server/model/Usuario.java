@@ -45,6 +45,9 @@ public class Usuario {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Column(name = "ai_generation_count", nullable = false)
+    private long aiGenerationCount;
+
     public Usuario() {}
 
     public Usuario(String email, String password, String nombre, RolUsuario rol) {
@@ -73,4 +76,6 @@ public class Usuario {
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     public LocalDateTime getDeletedAt() { return deletedAt; }
     public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+    public long getAiGenerationCount() { return aiGenerationCount; }
+    public void setAiGenerationCount(long aiGenerationCount) { this.aiGenerationCount = aiGenerationCount; }
 }

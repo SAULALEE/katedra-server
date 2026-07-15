@@ -58,7 +58,7 @@ class AssistantServiceTest {
     private ContenidoTemario contenidoConTeoria(String teoria) {
         Usuario usuario = new Usuario();
         usuario.setEmail(USER_EMAIL);
-        Temario temario = new Temario(usuario, "Pilas", "Pilas y colas", NivelAcademico.UNIVERSITARIO, "Programacion");
+        Temario temario = new Temario(usuario, "Pilas", "Pilas y colas", "universitario", "Programacion");
         ContenidoTemario contenido = new ContenidoTemario(temario);
         contenido.setTeoria(teoria);
         contenido.setModelo(ModeloIA.FLASH.getValor());
@@ -85,7 +85,7 @@ class AssistantServiceTest {
 
         assertThat(response.corregido()).isTrue();
         assertThat(response.content()).isEqualTo("## Teoría acortada.");
-        assertThat(response.modeloUsed()).isEqualTo(ModeloIA.FLASH);
+        assertThat(response.modeloUsed()).isEqualTo(ModeloIA.BASICO);
         verify(contenidoTemarioService).guardarTeoria(contenido, "## Teoría acortada.");
     }
 
@@ -160,7 +160,7 @@ class AssistantServiceTest {
         AssistantRequestDTO request = new AssistantRequestDTO(TEMARIO_ID, AssistantQuickAction.ACORTAR, null, ModeloIA.MAX);
         AssistantResponseDTO response = service.corregir(TEMARIO_ID, USER_EMAIL, request).get();
 
-        assertThat(response.modeloUsed()).isEqualTo(ModeloIA.FLASH);
+        assertThat(response.modeloUsed()).isEqualTo(ModeloIA.BASICO);
     }
 
     @Test

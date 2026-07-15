@@ -53,7 +53,7 @@ public class AssistantService {
      * regardless of what the client requests, so every correction can realistically finish
      * within {@link #TIMEOUT_SECONDS}.
      */
-    private static final ModeloIA MODELO_CORRECCION = ModeloIA.FLASH;
+    private static final ModeloIA MODELO_CORRECCION = ModeloIA.BASICO;
 
     private static final long TIMEOUT_SECONDS = 10;
 
@@ -109,7 +109,7 @@ public class AssistantService {
                     "Genera la teoría primero antes de usar el asistente de corrección");
         }
 
-        NivelAcademico nivel = contenido.getTemario().getGradoAcademico();
+        NivelAcademico nivel = NivelAcademico.fromGradoAcademico(contenido.getTemario().getGradoAcademico());
         OpenAiChatOptions.Builder options = OpenAiOptionsFactory.forModelo(MODELO_CORRECCION)
                 .maxTokens(estimarMaxTokensCorreccion(teoriaActual));
 

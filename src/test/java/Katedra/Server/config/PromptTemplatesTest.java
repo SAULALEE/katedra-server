@@ -64,6 +64,32 @@ class PromptTemplatesTest {
     }
 
     @Test
+    void shouldRequireProgressiveSourceGroundedTheoryWithoutRepetition() {
+        String prompt = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.PRO, NivelAcademico.UNIVERSITARIO);
+
+        assertThat(prompt)
+            .contains("mapa mental")
+            .contains("una sola vez")
+            .contains("información nueva")
+            .contains("contenido fuente")
+            .containsIgnoringCase("introducción")
+            .containsIgnoringCase("desarrollo")
+            .containsIgnoringCase("conclusión");
+    }
+
+    @Test
+    void shouldRequireFinalSemanticDeduplicationReview() {
+        String prompt = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.PRO, NivelAcademico.UNIVERSITARIO);
+
+        assertThat(prompt)
+            .contains("revisión final")
+            .contains("elimina o fusiona")
+            .contains("aporte exclusivo")
+            .contains("detalles concretos")
+            .contains("contenido fuente");
+    }
+
+    @Test
     void shouldBuildUserPromptWithAllFields() {
         String userPrompt = PromptTemplates.buildUserPrompt(
             "Programación",
