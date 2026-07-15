@@ -28,9 +28,8 @@ public class Temario {
     @Column(name = "descripcion", columnDefinition = "TEXT")
     private String descripcion;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "grado_academico", length = 20, nullable = false)
-    private NivelAcademico gradoAcademico;
+    @Column(name = "grado_academico", length = 255, nullable = false)
+    private String gradoAcademico;
 
     @Column(name = "asignatura", length = 100)
     private String asignatura;
@@ -47,7 +46,7 @@ public class Temario {
     // Default constructor
     public Temario() {}
 
-    public Temario(Usuario usuario, String titulo, String descripcion, NivelAcademico gradoAcademico, String asignatura) {
+    public Temario(Usuario usuario, String titulo, String descripcion, String gradoAcademico, String asignatura) {
         this.usuario = usuario;
         this.titulo = titulo;
         this.descripcion = descripcion;
@@ -67,8 +66,8 @@ public class Temario {
     public String getDescripcion() { return descripcion; }
     public void setDescripcion(String descripcion) { this.descripcion = descripcion; }
 
-    public NivelAcademico getGradoAcademico() { return gradoAcademico; }
-    public void setGradoAcademico(NivelAcademico gradoAcademico) { this.gradoAcademico = gradoAcademico; }
+    public String getGradoAcademico() { return gradoAcademico; }
+    public void setGradoAcademico(String gradoAcademico) { this.gradoAcademico = gradoAcademico; }
 
     public String getAsignatura() { return asignatura; }
     public void setAsignatura(String asignatura) { this.asignatura = asignatura; }

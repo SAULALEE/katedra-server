@@ -3,6 +3,9 @@ package Katedra.Server.model;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
+import java.text.Normalizer;
+import java.util.Locale;
+
 /**
  * Allowlist of academic levels a syllabus can target. The rubric is injected into every
  * generation prompt so the same topic reads differently depending on the student's level.
@@ -61,5 +64,34 @@ public enum NivelAcademico {
             }
         }
         throw new IllegalArgumentException("Nivel académico desconocido: " + valor);
+    }
+
+    public static NivelAcademico fromGradoAcademico(String gradoAcademico) {
+        if (gradoAcademico == null || gradoAcademico.isBlank()) {
+            throw new IllegalArgumentException("Nivel académico desconocido: " + gradoAcademico);
+        }
+
+        NivelAcademico resolved = null;
+        for (String item : gradoAcademico.split(",")) {
+            NivelAcademico candidate = fromEtiquetaFlexible(item);
+            if (candidate != null && (resolved == null || candidate.ordinal() > resolved.ordinal())) {
+                resolved = candidate;
+            }
+        }
+        return resolved != null ? resolved : UNIVERSITARIO;
+    }
+
+    private static NivelAcademico fromEtiquetaFlexible(String value) {
+        String normalized = Normalizer.normalize(value.trim(), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "primaria" -> PRIMARIA;
+            case "secundaria" -> SECUNDARIA;
+            case "preparatoria", "bachillerato" -> BACHILLERATO;
+            case "universidad", "universitario", "universitario (pregrado)" -> UNIVERSITARIO;
+            case "posgrado" -> POSGRADO;
+            default -> null;
+        };
     }
 }

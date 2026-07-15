@@ -11,6 +11,7 @@ import Katedra.Server.model.PiezaMaterial;
 import Katedra.Server.model.Temario;
 import Katedra.Server.repository.ContenidoTemarioRepository;
 import Katedra.Server.repository.TemarioRepository;
+import Katedra.Server.repository.UsuarioRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -33,14 +34,17 @@ public class ContenidoTemarioService {
     private final ContenidoTemarioRepository contenidoTemarioRepository;
     private final TemarioRepository temarioRepository;
     private final AiContentGeneratorService aiContentGeneratorService;
+    private final UsuarioRepository usuarioRepository;
 
     public ContenidoTemarioService(
             ContenidoTemarioRepository contenidoTemarioRepository,
             TemarioRepository temarioRepository,
-            AiContentGeneratorService aiContentGeneratorService) {
+            AiContentGeneratorService aiContentGeneratorService,
+            UsuarioRepository usuarioRepository) {
         this.contenidoTemarioRepository = contenidoTemarioRepository;
         this.temarioRepository = temarioRepository;
         this.aiContentGeneratorService = aiContentGeneratorService;
+        this.usuarioRepository = usuarioRepository;
     }
 
     @Transactional
@@ -69,11 +73,12 @@ public class ContenidoTemarioService {
         ContenidoTemario contenido = contenidoTemarioRepository.findByTemarioId(temarioId)
                 .orElseGet(() -> new ContenidoTemario(temario));
 
-        ModeloIA modeloTier = request.modelo() != null ? request.modelo() : ModeloIA.FLASH;
+        ModeloIA modeloTier = request.modelo() != null ? request.modelo() : ModeloIA.BASICO;
+        NivelAcademico nivelGeneracion = NivelAcademico.fromGradoAcademico(temario.getGradoAcademico());
         int numeroDiapositivas = resolverNumeroDiapositivas(modeloTier, request);
-        // Source text for teoría; once PDF/web ingestion lands this prefers temario
-        // source content.
-        String fuente = temario.getDescripcion();
+        String fuente = contenido.getTeoria() != null && !contenido.getTeoria().isBlank()
+                ? contenido.getTeoria()
+                : temario.getDescripcion();
 
         Set<PiezaMaterial> piezas = request.piezas();
         boolean generaTeoriaAhora = piezas.contains(PiezaMaterial.TEORIA);
@@ -91,7 +96,7 @@ public class ContenidoTemarioService {
         // output can be reused; otherwise the already-persisted theory is reused as-is.
         CompletableFuture<String> teoriaFuture = generaTeoriaAhora
                 ? aiContentGeneratorService.generarTeoria(
-                        temario.getAsignatura(), temario.getTitulo(), temario.getGradoAcademico(), fuente, modeloTier)
+                        temario.getAsignatura(), temario.getTitulo(), nivelGeneracion, fuente, modeloTier)
                 : CompletableFuture.completedFuture(teoriaGuardada);
 
         Map<PiezaMaterial, CompletableFuture<?>> futures = new EnumMap<>(PiezaMaterial.class);
@@ -129,6 +134,9 @@ public class ContenidoTemarioService {
                     // only advances when it actually produced something with the new tier.
                     if (algunExito) {
                         contenido.setModelo(modeloTier.getValor());
+                        usuarioRepository.incrementAiGenerationCount(
+                                temario.getUsuario().getId(),
+                                resultados.values().stream().filter(future -> future.join() != null).count());
                     }
                     ContenidoTemario saved = contenidoTemarioRepository.save(contenido);
                     return mapToDTO(saved, fallos);
@@ -193,8 +201,8 @@ public class ContenidoTemarioService {
             ModeloIA modeloTier, int numeroDiapositivas) {
         String asignatura = temario.getAsignatura();
         String titulo = temario.getTitulo();
-        NivelAcademico nivel = temario.getGradoAcademico();
-        String grado = nivel.getEtiqueta();
+        String grado = temario.getGradoAcademico();
+        NivelAcademico nivel = NivelAcademico.fromGradoAcademico(grado);
         return switch (pieza) {
             case TEORIA -> teoriaFuture;
             case EVALUACION -> teoriaFuture.thenCompose(teoriaTexto ->

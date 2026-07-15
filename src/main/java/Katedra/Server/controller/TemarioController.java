@@ -94,6 +94,11 @@ public class TemarioController {
         return ResponseEntity.ok(list);
     }
 
+    @GetMapping("/estadisticas")
+    public ResponseEntity<Katedra.Server.dto.TemarioStatsResponseDTO> getEstadisticas(Authentication authentication) {
+        return ResponseEntity.ok(temarioService.getEstadisticas(authentication.getName()));
+    }
+
     /**
      * Retrieves the details of a specific syllabus by its ID.
      * The syllabus must belong to the authenticated user.
@@ -109,6 +114,14 @@ public class TemarioController {
         String userEmail = authentication.getName();
         TemarioResponseDTO temario = temarioService.getTemarioById(id, userEmail);
         return ResponseEntity.ok(temario);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<TemarioResponseDTO> updateTemario(
+            @PathVariable String id,
+            @Valid @RequestBody TemarioRequestDTO request,
+            Authentication authentication) {
+        return ResponseEntity.ok(temarioService.updateTemario(id, authentication.getName(), request));
     }
 
     /**
