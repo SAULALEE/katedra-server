@@ -95,6 +95,17 @@ public class TemarioController {
     }
 
     /**
+     * Returns the authenticated user's total AI generation call count.
+     *
+     * @param authentication the authenticated user token
+     * @return the user's generation statistics
+     */
+    @GetMapping("/estadisticas")
+    public ResponseEntity<Katedra.Server.dto.TemarioStatsResponseDTO> getEstadisticas(Authentication authentication) {
+        return ResponseEntity.ok(temarioService.getEstadisticas(authentication.getName()));
+    }
+
+    /**
      * Retrieves the details of a specific syllabus by its ID.
      * The syllabus must belong to the authenticated user.
      *
@@ -109,6 +120,23 @@ public class TemarioController {
         String userEmail = authentication.getName();
         TemarioResponseDTO temario = temarioService.getTemarioById(id, userEmail);
         return ResponseEntity.ok(temario);
+    }
+
+    /**
+     * Updates the editable fields of a syllabus. The syllabus must belong to the
+     * authenticated user.
+     *
+     * @param id the unique UUID of the syllabus
+     * @param request the updated fields (title, description, degree, subject)
+     * @param authentication the authenticated user token
+     * @return the updated syllabus details
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<TemarioResponseDTO> updateTemario(
+            @PathVariable String id,
+            @Valid @RequestBody TemarioRequestDTO request,
+            Authentication authentication) {
+        return ResponseEntity.ok(temarioService.updateTemario(id, authentication.getName(), request));
     }
 
     /**

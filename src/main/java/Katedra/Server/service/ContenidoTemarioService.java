@@ -11,6 +11,7 @@ import Katedra.Server.model.PiezaMaterial;
 import Katedra.Server.model.Temario;
 import Katedra.Server.repository.ContenidoTemarioRepository;
 import Katedra.Server.repository.TemarioRepository;
+import Katedra.Server.repository.UsuarioRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -33,14 +34,17 @@ public class ContenidoTemarioService {
     private final ContenidoTemarioRepository contenidoTemarioRepository;
     private final TemarioRepository temarioRepository;
     private final AiContentGeneratorService aiContentGeneratorService;
+    private final UsuarioRepository usuarioRepository;
 
     public ContenidoTemarioService(
             ContenidoTemarioRepository contenidoTemarioRepository,
             TemarioRepository temarioRepository,
-            AiContentGeneratorService aiContentGeneratorService) {
+            AiContentGeneratorService aiContentGeneratorService,
+            UsuarioRepository usuarioRepository) {
         this.contenidoTemarioRepository = contenidoTemarioRepository;
         this.temarioRepository = temarioRepository;
         this.aiContentGeneratorService = aiContentGeneratorService;
+        this.usuarioRepository = usuarioRepository;
     }
 
     @Transactional
@@ -70,6 +74,7 @@ public class ContenidoTemarioService {
                 .orElseGet(() -> new ContenidoTemario(temario));
 
         ModeloIA modeloTier = request.modelo() != null ? request.modelo() : ModeloIA.FLASH;
+        NivelAcademico nivelGeneracion = NivelAcademico.fromGradoAcademico(temario.getGradoAcademico());
         int numeroDiapositivas = resolverNumeroDiapositivas(modeloTier, request);
         int numeroParrafos = resolverNumeroParrafos(modeloTier, request);
         int numeroPreguntas = resolverNumeroPreguntas(modeloTier, request);
@@ -93,13 +98,13 @@ public class ContenidoTemarioService {
         // output can be reused; otherwise the already-persisted theory is reused as-is.
         CompletableFuture<String> teoriaFuture = generaTeoriaAhora
                 ? aiContentGeneratorService.generarTeoria(
-                        temario.getAsignatura(), temario.getTitulo(), temario.getGradoAcademico(), fuente, modeloTier,
+                        temario.getAsignatura(), temario.getTitulo(), nivelGeneracion, fuente, modeloTier,
                         numeroParrafos)
                 : CompletableFuture.completedFuture(teoriaGuardada);
 
         Map<PiezaMaterial, CompletableFuture<?>> futures = new EnumMap<>(PiezaMaterial.class);
         for (PiezaMaterial pieza : piezas) {
-            futures.put(pieza, dispatch(pieza, temario, teoriaFuture, modeloTier, numeroDiapositivas, numeroPreguntas));
+            futures.put(pieza, dispatch(pieza, temario, nivelGeneracion, teoriaFuture, modeloTier, numeroDiapositivas, numeroPreguntas));
         }
 
         // Each failure is caught individually so one failed piece (e.g. an OpenAI
@@ -132,6 +137,9 @@ public class ContenidoTemarioService {
                     // only advances when it actually produced something with the new tier.
                     if (algunExito) {
                         contenido.setModelo(modeloTier.getValor());
+                        usuarioRepository.incrementAiGenerationCount(
+                                temario.getUsuario().getId(),
+                                resultados.values().stream().filter(future -> future.join() != null).count());
                     }
                     ContenidoTemario saved = contenidoTemarioRepository.save(contenido);
                     return mapToDTO(saved, fallos);
@@ -230,11 +238,10 @@ public class ContenidoTemarioService {
      * just generated in this same request or already persisted.
      */
     private CompletableFuture<?> dispatch(
-            PiezaMaterial pieza, Temario temario, CompletableFuture<String> teoriaFuture,
+            PiezaMaterial pieza, Temario temario, NivelAcademico nivel, CompletableFuture<String> teoriaFuture,
             ModeloIA modeloTier, int numeroDiapositivas, int numeroPreguntas) {
         String asignatura = temario.getAsignatura();
         String titulo = temario.getTitulo();
-        NivelAcademico nivel = temario.getGradoAcademico();
         String grado = nivel.getEtiqueta();
         return switch (pieza) {
             case TEORIA -> teoriaFuture;

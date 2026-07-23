@@ -4,7 +4,6 @@ import Katedra.Server.dto.TemarioRequestDTO;
 import Katedra.Server.dto.TemarioResponseDTO;
 import Katedra.Server.dto.TemarioDriveRequestDTO;
 import Katedra.Server.dto.TemarioUrlRequestDTO;
-import Katedra.Server.model.NivelAcademico;
 import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.ContenidoTemario;
 import Katedra.Server.model.Temario;
@@ -64,7 +63,7 @@ class TemarioServiceTest {
         mockUsuario = new Usuario("profesor@katedra.com", "securepassword", "Saul", RolUsuario.ROLE_PROFESOR);
         ReflectionTestUtils.setField(mockUsuario, "id", "user-uuid-123");
 
-        mockTemario = new Temario(mockUsuario, "Curso de Spring Boot", "Temario completo de Spring Boot", NivelAcademico.UNIVERSITARIO, "Programacion");
+        mockTemario = new Temario(mockUsuario, "Curso de Spring Boot", "Temario completo de Spring Boot", "universitario", "Programacion");
         mockTemario.setId("temario-uuid-456");
         mockTemario.setCreatedAt(LocalDateTime.now());
         mockTemario.setUpdatedAt(LocalDateTime.now());
@@ -76,7 +75,7 @@ class TemarioServiceTest {
         TemarioRequestDTO request = new TemarioRequestDTO(
                 "Curso de Spring Boot",
                 "Temario completo de Spring Boot",
-                NivelAcademico.UNIVERSITARIO,
+                "universitario",
                 "Programacion"
         );
         given(usuarioRepository.findByEmail(mockUsuario.getEmail())).willReturn(Optional.of(mockUsuario));
@@ -90,7 +89,7 @@ class TemarioServiceTest {
         assertThat(response.id()).isEqualTo("temario-uuid-456");
         assertThat(response.titulo()).isEqualTo("Curso de Spring Boot");
         assertThat(response.descripcion()).isEqualTo("Temario completo de Spring Boot");
-        assertThat(response.gradoAcademico()).isEqualTo(NivelAcademico.UNIVERSITARIO);
+        assertThat(response.gradoAcademico()).isEqualTo("universitario");
         assertThat(response.asignatura()).isEqualTo("Programacion");
 
         verify(usuarioRepository).findByEmail(mockUsuario.getEmail());
@@ -103,7 +102,7 @@ class TemarioServiceTest {
         TemarioRequestDTO request = new TemarioRequestDTO(
                 "Curso de Spring Boot",
                 "Temario completo de Spring Boot",
-                NivelAcademico.UNIVERSITARIO,
+                "universitario",
                 "Programacion"
         );
         given(usuarioRepository.findByEmail("unknown@katedra.com")).willReturn(Optional.empty());

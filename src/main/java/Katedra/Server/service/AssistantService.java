@@ -109,7 +109,7 @@ public class AssistantService {
                     "Genera la teoría primero antes de usar el asistente de corrección");
         }
 
-        NivelAcademico nivel = contenido.getTemario().getGradoAcademico();
+        NivelAcademico nivel = NivelAcademico.fromGradoAcademico(contenido.getTemario().getGradoAcademico());
         OpenAiChatOptions.Builder options = OpenAiOptionsFactory.forModelo(MODELO_CORRECCION)
                 .maxTokens(estimarMaxTokensCorreccion(teoriaActual));
 
