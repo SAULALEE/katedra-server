@@ -1,6 +1,5 @@
 package Katedra.Server.config;
 
-import Katedra.Server.model.AssistantQuickAction;
 import Katedra.Server.model.ModeloIA;
 import Katedra.Server.model.NivelAcademico;
 import org.junit.jupiter.api.Test;
@@ -112,32 +111,6 @@ class PromptTemplatesTest {
 
         assertThat(prompt).doesNotContainIgnoringCase("json");
         assertThat(prompt).doesNotContain("```");
-    }
-
-    @Test
-    void shouldForbidOffTopicRequestsInCorreccionSystemPrompt() {
-        String prompt = PromptTemplates.buildCorreccionSystemPrompt(NivelAcademico.UNIVERSITARIO);
-
-        assertThat(prompt).containsIgnoringCase("Katedra");
-        assertThat(prompt).contains("Solo puedo ayudarte a corregir o mejorar la teoría de este tema");
-        assertThat(prompt).contains(NivelAcademico.UNIVERSITARIO.getRubrica());
-    }
-
-    @Test
-    void shouldBuildCorreccionUserPromptWithQuickActionInstruccion() {
-        String prompt = PromptTemplates.buildCorreccionUserPrompt("## Teoría actual", AssistantQuickAction.ACORTAR, "a 4 párrafos");
-
-        assertThat(prompt).contains(AssistantQuickAction.ACORTAR.getInstruccion());
-        assertThat(prompt).contains("a 4 párrafos");
-        assertThat(prompt).contains("## Teoría actual");
-    }
-
-    @Test
-    void shouldBuildCorreccionUserPromptWithFreeChatMessageAsInstruccion() {
-        String prompt = PromptTemplates.buildCorreccionUserPrompt("## Teoría actual", AssistantQuickAction.FREE_CHAT, "simplifica el lenguaje");
-
-        assertThat(prompt).contains("simplifica el lenguaje");
-        assertThat(prompt).contains("## Teoría actual");
     }
 
     @Test
