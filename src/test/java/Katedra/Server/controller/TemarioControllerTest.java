@@ -233,6 +233,35 @@ class TemarioControllerTest {
     }
 
     @Test
+    void shouldGetAuthenticatedProfessorAsignaturas() throws Exception {
+        given(temarioService.getAsignaturasByUser("profesor@katedra.com"))
+                .willReturn(List.of("Arquitectura", "Programacion"));
+
+        mockMvc.perform(get("/temarios/asignaturas")
+                        .principal(mockPrincipal))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value("Arquitectura"))
+                .andExpect(jsonPath("$[1]").value("Programacion"));
+
+        verify(temarioService).getAsignaturasByUser("profesor@katedra.com");
+    }
+
+    @Test
+    void shouldGetAuthenticatedProfessorTemariosFilteredByAsignatura() throws Exception {
+        given(temarioService.getTemariosByAsignatura("profesor@katedra.com", "Programacion"))
+                .willReturn(List.of(mockResponse));
+
+        mockMvc.perform(get("/temarios")
+                        .param("asignatura", "Programacion")
+                        .principal(mockPrincipal))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value("temario-uuid-123"))
+                .andExpect(jsonPath("$[0].asignatura").value("Programacion"));
+
+        verify(temarioService).getTemariosByAsignatura("profesor@katedra.com", "Programacion");
+    }
+
+    @Test
     void shouldGetTemarioById() throws Exception {
         given(temarioService.getTemarioById("temario-uuid-123", "profesor@katedra.com"))
                 .willReturn(mockResponse);

@@ -171,6 +171,34 @@ class TemarioServiceTest {
     }
 
     @Test
+    void shouldGetUniqueAsignaturasForAuthenticatedUser() {
+        given(usuarioRepository.findByEmail(mockUsuario.getEmail())).willReturn(Optional.of(mockUsuario));
+        given(temarioRepository.findDistinctAsignaturasByUsuarioId(mockUsuario.getId()))
+                .willReturn(List.of("Arquitectura", "Programacion"));
+
+        List<String> asignaturas = temarioService.getAsignaturasByUser(mockUsuario.getEmail());
+
+        assertThat(asignaturas).containsExactly("Arquitectura", "Programacion");
+        verify(temarioRepository).findDistinctAsignaturasByUsuarioId(mockUsuario.getId());
+    }
+
+    @Test
+    void shouldGetOnlyAuthenticatedUserTemariosForAsignatura() {
+        given(usuarioRepository.findByEmail(mockUsuario.getEmail())).willReturn(Optional.of(mockUsuario));
+        given(temarioRepository.findByUsuarioIdAndAsignaturaOrderByCreatedAtAsc(
+                mockUsuario.getId(), "Programacion"))
+                .willReturn(List.of(mockTemario));
+
+        List<TemarioResponseDTO> temarios = temarioService.getTemariosByAsignatura(
+                mockUsuario.getEmail(), "Programacion");
+
+        assertThat(temarios).singleElement()
+                .satisfies(temario -> assertThat(temario.asignatura()).isEqualTo("Programacion"));
+        verify(temarioRepository).findByUsuarioIdAndAsignaturaOrderByCreatedAtAsc(
+                mockUsuario.getId(), "Programacion");
+    }
+
+    @Test
     void shouldGetTemarioByIdSuccessfully() {
         // Arrange
         given(temarioRepository.findById(mockTemario.getId())).willReturn(Optional.of(mockTemario));
