@@ -2,6 +2,7 @@ package Katedra.Server.dto;
 
 import Katedra.Server.model.ModeloIA;
 import Katedra.Server.model.PiezaMaterial;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 import java.util.Set;
 
@@ -21,6 +22,7 @@ import java.util.Set;
  *                           tier's default. Must fall within the selected model tier's
  *                           [min, max] range.
  */
+@JsonDeserialize(using = GenerarMaterialRequestDTODeserializer.class)
 public record GenerarMaterialRequestDTO(
     Set<PiezaMaterial> piezas,
     ModeloIA modelo,

@@ -1,0 +1,2 @@
+ALTER TABLE temario
+    MODIFY COLUMN grado_academico VARCHAR(255) NOT NULL;

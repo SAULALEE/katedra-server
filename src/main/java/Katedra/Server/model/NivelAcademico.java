@@ -3,6 +3,9 @@ package Katedra.Server.model;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
+import java.text.Normalizer;
+import java.util.Locale;
+
 /**
  * Allowlist of academic levels a syllabus can target. The rubric is injected into every
  * generation prompt so the same topic reads differently depending on the student's level.
@@ -61,5 +64,42 @@ public enum NivelAcademico {
             }
         }
         throw new IllegalArgumentException("Nivel académico desconocido: " + valor);
+    }
+
+    /**
+     * Resolves the free-text {@code Temario.gradoAcademico} (a comma-separated list of
+     * user-facing labels, e.g. "Primaria, Secundaria, Diplomado") into the single
+     * {@link NivelAcademico} band used to drive generation prompts. When multiple bands
+     * are present the highest (most advanced) one wins, since prompts should never
+     * undershoot the most demanding audience selected. Unrecognized text defaults to
+     * {@link #UNIVERSITARIO} rather than failing the request.
+     */
+    public static NivelAcademico fromGradoAcademico(String gradoAcademico) {
+        if (gradoAcademico == null || gradoAcademico.isBlank()) {
+            throw new IllegalArgumentException("Nivel académico desconocido: " + gradoAcademico);
+        }
+
+        NivelAcademico resolved = null;
+        for (String item : gradoAcademico.split(",")) {
+            NivelAcademico candidate = fromEtiquetaFlexible(item);
+            if (candidate != null && (resolved == null || candidate.ordinal() > resolved.ordinal())) {
+                resolved = candidate;
+            }
+        }
+        return resolved != null ? resolved : UNIVERSITARIO;
+    }
+
+    private static NivelAcademico fromEtiquetaFlexible(String value) {
+        String normalized = Normalizer.normalize(value.trim(), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "primaria" -> PRIMARIA;
+            case "secundaria" -> SECUNDARIA;
+            case "preparatoria", "bachillerato" -> BACHILLERATO;
+            case "universidad", "universitario", "universitario (pregrado)" -> UNIVERSITARIO;
+            case "posgrado" -> POSGRADO;
+            default -> null;
+        };
     }
 }

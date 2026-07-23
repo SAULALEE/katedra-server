@@ -5,7 +5,6 @@ import Katedra.Server.dto.AssistantResponseDTO;
 import Katedra.Server.model.AssistantQuickAction;
 import Katedra.Server.model.ContenidoTemario;
 import Katedra.Server.model.ModeloIA;
-import Katedra.Server.model.NivelAcademico;
 import Katedra.Server.model.Temario;
 import Katedra.Server.model.Usuario;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,7 +57,7 @@ class AssistantServiceTest {
     private ContenidoTemario contenidoConTeoria(String teoria) {
         Usuario usuario = new Usuario();
         usuario.setEmail(USER_EMAIL);
-        Temario temario = new Temario(usuario, "Pilas", "Pilas y colas", NivelAcademico.UNIVERSITARIO, "Programacion");
+        Temario temario = new Temario(usuario, "Pilas", "Pilas y colas", "universitario", "Programacion");
         ContenidoTemario contenido = new ContenidoTemario(temario);
         contenido.setTeoria(teoria);
         contenido.setModelo(ModeloIA.FLASH.getValor());

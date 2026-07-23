@@ -51,6 +51,9 @@ class ContenidoTemarioServiceTest {
     @Mock
     private AiContentGeneratorService aiContentGeneratorService;
 
+    @Mock
+    private Katedra.Server.repository.UsuarioRepository usuarioRepository;
+
     @InjectMocks
     private ContenidoTemarioService contenidoTemarioService;
 
@@ -64,7 +67,7 @@ class ContenidoTemarioServiceTest {
         mockUsuario = new Usuario("profesor@katedra.com", "securepassword", "Saul", RolUsuario.ROLE_PROFESOR);
         ReflectionTestUtils.setField(mockUsuario, "id", "user-uuid-123");
 
-        mockTemario = new Temario(mockUsuario, "Estructuras de Datos", "Pilas y colas", NivelAcademico.UNIVERSITARIO, "Programacion");
+        mockTemario = new Temario(mockUsuario, "Estructuras de Datos", "Pilas y colas", "universitario", "Programacion");
         mockTemario.setId("temario-uuid-456");
 
         mockEvaluacion = List.of(new EvaluacionPreguntaDTO("¿Pregunta?", List.of("A", "B", "C", "D"), 0, "Explicación"));

@@ -5,7 +5,6 @@ import Katedra.Server.dto.TemarioResponseDTO;
 import Katedra.Server.dto.TemarioUploadResponseDTO;
 import Katedra.Server.dto.TemarioDriveRequestDTO;
 import Katedra.Server.dto.TemarioUrlRequestDTO;
-import Katedra.Server.model.NivelAcademico;
 import Katedra.Server.service.ContenidoTemarioService;
 import Katedra.Server.service.TemarioService;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,7 +67,7 @@ class TemarioControllerTest {
                 "temario-uuid-123",
                 "Curso de Java",
                 "Aprende Java 21",
-                NivelAcademico.UNIVERSITARIO,
+                "universitario",
                 "Programacion",
                 LocalDateTime.now(),
                 LocalDateTime.now()
