@@ -57,11 +57,17 @@ public class WebSecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // Public endpoints
                 .requestMatchers("/auth/**", "/api/v1/auth/**").permitAll()
                 .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                 .requestMatchers("/error").permitAll()
+                // ROLE_ADMIN: user management only
                 .requestMatchers("/usuarios/**").hasRole("ADMIN")
-                .anyRequest().authenticated()
+                // ROLE_PROFESOR: academic features only
+                .requestMatchers("/asignaturas/**").hasRole("PROFESOR")
+                .requestMatchers("/temarios/**").hasRole("PROFESOR")
+                // Deny everything else
+                .anyRequest().denyAll()
             )
             .exceptionHandling(exceptions -> exceptions
                 .accessDeniedHandler((request, response, accessDeniedException) ->

@@ -4,6 +4,7 @@ import Katedra.Server.dto.ContenidoTemarioResponseDTO;
 import Katedra.Server.dto.DiapositivaDTO;
 import Katedra.Server.dto.EvaluacionPreguntaDTO;
 import Katedra.Server.dto.GenerarMaterialRequestDTO;
+import Katedra.Server.model.Asignatura;
 import Katedra.Server.model.ContenidoTemario;
 import Katedra.Server.model.ModeloIA;
 import Katedra.Server.model.NivelAcademico;
@@ -13,6 +14,7 @@ import Katedra.Server.model.Temario;
 import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.ContenidoTemarioRepository;
 import Katedra.Server.repository.TemarioRepository;
+import Katedra.Server.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -49,10 +52,10 @@ class ContenidoTemarioServiceTest {
     private TemarioRepository temarioRepository;
 
     @Mock
-    private AiContentGeneratorService aiContentGeneratorService;
+    private UsuarioRepository usuarioRepository;
 
     @Mock
-    private Katedra.Server.repository.UsuarioRepository usuarioRepository;
+    private AiContentGeneratorService aiContentGeneratorService;
 
     @InjectMocks
     private ContenidoTemarioService contenidoTemarioService;
@@ -67,7 +70,10 @@ class ContenidoTemarioServiceTest {
         mockUsuario = new Usuario("profesor@katedra.com", "securepassword", "Saul", RolUsuario.ROLE_PROFESOR);
         ReflectionTestUtils.setField(mockUsuario, "id", "user-uuid-123");
 
-        mockTemario = new Temario(mockUsuario, "Estructuras de Datos", "Pilas y colas", "universitario", "Programacion");
+        Asignatura asignatura = new Asignatura(mockUsuario, "Programacion", null);
+        ReflectionTestUtils.setField(asignatura, "id", "asignatura-1");
+        mockTemario = new Temario(
+                mockUsuario, "Estructuras de Datos", "Pilas y colas", "universitario", asignatura);
         mockTemario.setId("temario-uuid-456");
 
         mockEvaluacion = List.of(new EvaluacionPreguntaDTO("¿Pregunta?", List.of("A", "B", "C", "D"), 0, "Explicación"));
@@ -142,6 +148,48 @@ class ContenidoTemarioServiceTest {
         assertThat(exception.getReason()).contains("Acceso denegado");
     }
 
+    @Test
+    void shouldReturnPersistedOriginalSourceForFileOrUrl() {
+        ContenidoTemario existing = contenidoConId(mockTemario);
+        existing.setContenidoFuente("Texto original extraído");
+        existing.setTeoria("## Teoría docente generada");
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456"))
+                .willReturn(Optional.of(existing));
+
+        var response = contenidoTemarioService.getFuenteByTemarioId(
+                "temario-uuid-456", "profesor@katedra.com");
+
+        assertThat(response.temarioId()).isEqualTo("temario-uuid-456");
+        assertThat(response.contenidoFuente()).isEqualTo("Texto original extraído");
+    }
+
+    @Test
+    void shouldReturnGeneratedSyllabusAsManualSource() {
+        ContenidoTemario existing = contenidoConId(mockTemario);
+        existing.setTeoria("## Temario manual generado por IA");
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456"))
+                .willReturn(Optional.of(existing));
+
+        var response = contenidoTemarioService.getFuenteByTemarioId(
+                "temario-uuid-456", "profesor@katedra.com");
+
+        assertThat(response.contenidoFuente()).isEqualTo("## Temario manual generado por IA");
+    }
+
+    @Test
+    void shouldRejectSourceAccessFromAnotherUser() {
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                contenidoTemarioService.getFuenteByTemarioId(
+                        "temario-uuid-456", "other@katedra.com"));
+
+        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        verify(contenidoTemarioRepository, never()).findByTemarioId(anyString());
+    }
+
     // --- generarMaterial: validación de request ---
 
     @Test
@@ -193,11 +241,32 @@ class ContenidoTemarioServiceTest {
         assertThat(response.teoria()).isEqualTo("## Teoría existente");
         assertThat(response.diapositivas()).isNull();
         assertThat(response.modelo()).isEqualTo("flash");
+        verify(usuarioRepository).incrementAiGenerationCount(mockUsuario.getId(), 1L);
 
         verify(aiContentGeneratorService, never())
                 .generarTeoria(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), anyInt());
         verify(aiContentGeneratorService, never())
                 .generarDiapositivas(anyString(), anyString(), anyString(), anyString(), any(ModeloIA.class), anyInt());
+    }
+
+    @Test
+    void shouldUseIngestedTextAsSourceWhenGeneratingTheory() throws Exception {
+        ContenidoTemario existing = contenidoConId(mockTemario);
+        existing.setTeoria("Texto extraido del archivo sobre pilas y colas");
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.of(existing));
+        given(aiContentGeneratorService.generarTeoria(
+                anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), anyInt()))
+                .willReturn(CompletableFuture.completedFuture("## Teoria generada"));
+        stubSaveEchoingWithId();
+
+        contenidoTemarioService.generarMaterial(
+                "temario-uuid-456", "profesor@katedra.com",
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.TEORIA), ModeloIA.FLASH, null, null, null, null)).get();
+
+        verify(aiContentGeneratorService).generarTeoria(
+                eq("Programacion"), eq("Estructuras de Datos"), eq(NivelAcademico.UNIVERSITARIO),
+                eq("Texto extraido del archivo sobre pilas y colas"), eq(ModeloIA.FLASH), anyInt());
     }
 
     @Test
@@ -222,6 +291,7 @@ class ContenidoTemarioServiceTest {
         verify(aiContentGeneratorService)
                 .generarEvaluacion(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), anyInt());
         verify(contenidoTemarioRepository).save(existing);
+        verify(usuarioRepository).incrementAiGenerationCount(mockUsuario.getId(), 1L);
     }
 
     // --- generarMaterial: fundamentación en teoría ---
@@ -350,6 +420,7 @@ class ContenidoTemarioServiceTest {
         assertThat(response.diapositivas()).isEqualTo(mockDiapositivas);
         // null modelo defaults to FLASH
         assertThat(response.modelo()).isEqualTo("flash");
+        verify(usuarioRepository).incrementAiGenerationCount(mockUsuario.getId(), 3L);
     }
 
     // --- generarMaterial: fallos por pieza ---
@@ -397,6 +468,7 @@ class ContenidoTemarioServiceTest {
         assertThat(response.teoria()).isNull();
         assertThat(response.modelo()).isNull();
         assertThat(response.piezasFallidas()).containsEntry("teoria", "model overloaded");
+        verify(usuarioRepository, never()).incrementAiGenerationCount(anyString(), anyLong());
     }
 
     // --- generarMaterial: numeroDiapositivas ---

@@ -206,6 +206,11 @@ public enum ModeloIA {
      * Catedrático: most rigorous and in-depth). Independent of {@link NivelAcademico},
      * which adapts to the student's grade level rather than to how deep or fast the
      * chosen tier should reason.
+     *
+     * <p>Currently unused: the theory profile injected into the prompt comes from
+     * {@code teoria-basico.st} / {@code teoria-avanzado.st}. Kept as the canonical
+     * written description of each tier's depth contract, and as the fallback if the
+     * profiles ever move back into code. {@link #getEstiloEvaluacion()} is still live.
      */
     public String getEstiloTeoria() {
         return estiloTeoria;
@@ -223,7 +228,7 @@ public enum ModeloIA {
     @JsonCreator
     public static ModeloIA fromValor(String valor) {
         for (ModeloIA modelo : values()) {
-            if (modelo.valor.equalsIgnoreCase(valor)) {
+            if (modelo.valor.equalsIgnoreCase(valor) || modelo.modelId.equalsIgnoreCase(valor)) {
                 return modelo;
             }
         }
