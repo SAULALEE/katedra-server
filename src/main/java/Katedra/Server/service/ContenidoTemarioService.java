@@ -71,6 +71,8 @@ public class ContenidoTemarioService {
 
         ModeloIA modeloTier = request.modelo() != null ? request.modelo() : ModeloIA.FLASH;
         int numeroDiapositivas = resolverNumeroDiapositivas(modeloTier, request);
+        int numeroParrafos = resolverNumeroParrafos(modeloTier, request);
+        int numeroPreguntas = resolverNumeroPreguntas(modeloTier, request);
         // Source text for teoría; once PDF/web ingestion lands this prefers temario
         // source content.
         String fuente = temario.getDescripcion();
@@ -91,12 +93,13 @@ public class ContenidoTemarioService {
         // output can be reused; otherwise the already-persisted theory is reused as-is.
         CompletableFuture<String> teoriaFuture = generaTeoriaAhora
                 ? aiContentGeneratorService.generarTeoria(
-                        temario.getAsignatura(), temario.getTitulo(), temario.getGradoAcademico(), fuente, modeloTier)
+                        temario.getAsignatura(), temario.getTitulo(), temario.getGradoAcademico(), fuente, modeloTier,
+                        numeroParrafos)
                 : CompletableFuture.completedFuture(teoriaGuardada);
 
         Map<PiezaMaterial, CompletableFuture<?>> futures = new EnumMap<>(PiezaMaterial.class);
         for (PiezaMaterial pieza : piezas) {
-            futures.put(pieza, dispatch(pieza, temario, teoriaFuture, modeloTier, numeroDiapositivas));
+            futures.put(pieza, dispatch(pieza, temario, teoriaFuture, modeloTier, numeroDiapositivas, numeroPreguntas));
         }
 
         // Each failure is caught individually so one failed piece (e.g. an OpenAI
@@ -184,13 +187,51 @@ public class ContenidoTemarioService {
     }
 
     /**
+     * Resolves the theory paragraph count against the chosen tier: null falls back to
+     * the tier default; an explicit value is validated against the tier's [min, max]
+     * range only when theory is actually requested, rejecting out-of-range values with 400.
+     */
+    private int resolverNumeroParrafos(ModeloIA modeloTier, GenerarMaterialRequestDTO request) {
+        Integer solicitado = request.numeroParrafos();
+        if (solicitado == null) {
+            return modeloTier.getDefaultParrafosTeoria();
+        }
+        if (request.piezas().contains(PiezaMaterial.TEORIA)
+                && (solicitado < modeloTier.getMinParrafosTeoria() || solicitado > modeloTier.getMaxParrafosTeoria())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format(
+                    "El número de párrafos para el modelo %s debe estar entre %d y %d",
+                    modeloTier.name(), modeloTier.getMinParrafosTeoria(), modeloTier.getMaxParrafosTeoria()));
+        }
+        return solicitado;
+    }
+
+    /**
+     * Resolves the evaluation question count against the chosen tier: null falls back to
+     * the tier default; an explicit value is validated against the tier's [min, max]
+     * range only when an evaluation is actually requested, rejecting out-of-range values with 400.
+     */
+    private int resolverNumeroPreguntas(ModeloIA modeloTier, GenerarMaterialRequestDTO request) {
+        Integer solicitado = request.numeroPreguntas();
+        if (solicitado == null) {
+            return modeloTier.getDefaultPreguntas();
+        }
+        if (request.piezas().contains(PiezaMaterial.EVALUACION)
+                && (solicitado < modeloTier.getMinPreguntas() || solicitado > modeloTier.getMaxPreguntas())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format(
+                    "El número de preguntas para el modelo %s debe estar entre %d y %d",
+                    modeloTier.name(), modeloTier.getMinPreguntas(), modeloTier.getMaxPreguntas()));
+        }
+        return solicitado;
+    }
+
+    /**
      * Dispatches a single piece. EVALUACION/DIAPOSITIVAS chain off {@code teoriaFuture}
      * so they always run after (and are grounded in) the theory text, whether it was
      * just generated in this same request or already persisted.
      */
     private CompletableFuture<?> dispatch(
             PiezaMaterial pieza, Temario temario, CompletableFuture<String> teoriaFuture,
-            ModeloIA modeloTier, int numeroDiapositivas) {
+            ModeloIA modeloTier, int numeroDiapositivas, int numeroPreguntas) {
         String asignatura = temario.getAsignatura();
         String titulo = temario.getTitulo();
         NivelAcademico nivel = temario.getGradoAcademico();
@@ -198,7 +239,7 @@ public class ContenidoTemarioService {
         return switch (pieza) {
             case TEORIA -> teoriaFuture;
             case EVALUACION -> teoriaFuture.thenCompose(teoriaTexto ->
-                    aiContentGeneratorService.generarEvaluacion(asignatura, titulo, nivel, teoriaTexto, modeloTier));
+                    aiContentGeneratorService.generarEvaluacion(asignatura, titulo, nivel, teoriaTexto, modeloTier, numeroPreguntas));
             case DIAPOSITIVAS -> teoriaFuture.thenCompose(teoriaTexto ->
                     aiContentGeneratorService.generarDiapositivas(asignatura, titulo, grado, teoriaTexto, modeloTier, numeroDiapositivas));
         };

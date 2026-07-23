@@ -15,10 +15,17 @@ import java.util.Set;
  *                           deserialization. Every requested piece regenerates regardless.
  * @param numeroDiapositivas requested slide count; null defaults to the tier's default.
  *                           Must fall within the selected model tier's [min, max] range.
+ * @param numeroParrafos     requested theory paragraph count; null defaults to the tier's
+ *                           default. Must fall within the selected model tier's [min, max] range.
+ * @param numeroPreguntas    requested evaluation question count; null defaults to the
+ *                           tier's default. Must fall within the selected model tier's
+ *                           [min, max] range.
  */
 public record GenerarMaterialRequestDTO(
     Set<PiezaMaterial> piezas,
     ModeloIA modelo,
     Set<PiezaMaterial> regenerarPiezas,
-    Integer numeroDiapositivas
+    Integer numeroDiapositivas,
+    Integer numeroParrafos,
+    Integer numeroPreguntas
 ) {}

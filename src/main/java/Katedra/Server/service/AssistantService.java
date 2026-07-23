@@ -48,7 +48,7 @@ public class AssistantService {
             "No se pudo procesar la corrección en este momento. Intenta de nuevo.";
 
     /**
-     * Corrections must never route to a reasoning tier (PRO/MAX routinely take 30-90s per
+     * Corrections must never route to a reasoning tier (PRO routinely takes 30-90s per
      * {@code application.properties}) — always use the fast, non-reasoning FLASH model
      * regardless of what the client requests, so every correction can realistically finish
      * within {@link #TIMEOUT_SECONDS}.

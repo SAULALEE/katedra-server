@@ -76,7 +76,8 @@ class AiContentGeneratorServiceTest {
         stubContent("## Teoría de prueba");
 
         String result = service.generarTeoria(
-                "Programacion", "Pilas", NivelAcademico.UNIVERSITARIO, "Pilas y colas", ModeloIA.FLASH).get();
+                "Programacion", "Pilas", NivelAcademico.UNIVERSITARIO, "Pilas y colas", ModeloIA.FLASH,
+                ModeloIA.FLASH.getDefaultParrafosTeoria()).get();
 
         assertThat(result).isEqualTo("## Teoría de prueba");
     }
@@ -86,7 +87,8 @@ class AiContentGeneratorServiceTest {
         stubContent("## Teoría profunda");
 
         String result = service.generarTeoria(
-                "Programacion", "Pilas", NivelAcademico.POSGRADO, "Pilas y colas", ModeloIA.MAX).get();
+                "Programacion", "Pilas", NivelAcademico.POSGRADO, "Pilas y colas", ModeloIA.PRO,
+                ModeloIA.PRO.getDefaultParrafosTeoria()).get();
 
         assertThat(result).isEqualTo("## Teoría profunda");
     }
@@ -96,7 +98,8 @@ class AiContentGeneratorServiceTest {
         stubFailure();
 
         CompletableFuture<String> future = service.generarTeoria(
-                "Programacion", "Pilas", NivelAcademico.UNIVERSITARIO, null, ModeloIA.FLASH);
+                "Programacion", "Pilas", NivelAcademico.UNIVERSITARIO, null, ModeloIA.FLASH,
+                ModeloIA.FLASH.getDefaultParrafosTeoria());
 
         assertThatThrownBy(future::get)
                 .hasCauseInstanceOf(RuntimeException.class)
@@ -112,7 +115,8 @@ class AiContentGeneratorServiceTest {
         stubEntity(preguntas);
 
         List<EvaluacionPreguntaDTO> result = service.generarEvaluacion(
-                "Programacion", "Pilas", NivelAcademico.UNIVERSITARIO, "Pilas y colas", MODELO).get();
+                "Programacion", "Pilas", NivelAcademico.UNIVERSITARIO, "Pilas y colas", MODELO,
+                MODELO.getDefaultPreguntas()).get();
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().pregunta()).isEqualTo("¿Qué es una pila?");
@@ -124,7 +128,7 @@ class AiContentGeneratorServiceTest {
         stubFailure();
 
         CompletableFuture<List<EvaluacionPreguntaDTO>> future = service.generarEvaluacion(
-                "Programacion", "Pilas", NivelAcademico.UNIVERSITARIO, null, MODELO);
+                "Programacion", "Pilas", NivelAcademico.UNIVERSITARIO, null, MODELO, MODELO.getDefaultPreguntas());
 
         assertThatThrownBy(future::get)
                 .hasCauseInstanceOf(RuntimeException.class)
