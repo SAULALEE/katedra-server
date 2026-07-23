@@ -4,6 +4,7 @@ import Katedra.Server.dto.ContenidoTemarioResponseDTO;
 import Katedra.Server.dto.DiapositivaDTO;
 import Katedra.Server.dto.EvaluacionPreguntaDTO;
 import Katedra.Server.dto.GenerarMaterialRequestDTO;
+import Katedra.Server.model.Asignatura;
 import Katedra.Server.model.ContenidoTemario;
 import Katedra.Server.model.ModeloIA;
 import Katedra.Server.model.NivelAcademico;
@@ -69,7 +70,10 @@ class ContenidoTemarioServiceTest {
         mockUsuario = new Usuario("profesor@katedra.com", "securepassword", "Saul", RolUsuario.ROLE_PROFESOR);
         ReflectionTestUtils.setField(mockUsuario, "id", "user-uuid-123");
 
-        mockTemario = new Temario(mockUsuario, "Estructuras de Datos", "Pilas y colas", "universitario", "Programacion");
+        Asignatura asignatura = new Asignatura(mockUsuario, "Programacion", null);
+        ReflectionTestUtils.setField(asignatura, "id", "asignatura-1");
+        mockTemario = new Temario(
+                mockUsuario, "Estructuras de Datos", "Pilas y colas", "universitario", asignatura);
         mockTemario.setId("temario-uuid-456");
 
         mockEvaluacion = List.of(new EvaluacionPreguntaDTO("¿Pregunta?", List.of("A", "B", "C", "D"), 0, "Explicación"));
@@ -144,6 +148,48 @@ class ContenidoTemarioServiceTest {
         assertThat(exception.getReason()).contains("Acceso denegado");
     }
 
+    @Test
+    void shouldReturnPersistedOriginalSourceForFileOrUrl() {
+        ContenidoTemario existing = contenidoConId(mockTemario);
+        existing.setContenidoFuente("Texto original extraído");
+        existing.setTeoria("## Teoría docente generada");
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456"))
+                .willReturn(Optional.of(existing));
+
+        var response = contenidoTemarioService.getFuenteByTemarioId(
+                "temario-uuid-456", "profesor@katedra.com");
+
+        assertThat(response.temarioId()).isEqualTo("temario-uuid-456");
+        assertThat(response.contenidoFuente()).isEqualTo("Texto original extraído");
+    }
+
+    @Test
+    void shouldReturnGeneratedSyllabusAsManualSource() {
+        ContenidoTemario existing = contenidoConId(mockTemario);
+        existing.setTeoria("## Temario manual generado por IA");
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456"))
+                .willReturn(Optional.of(existing));
+
+        var response = contenidoTemarioService.getFuenteByTemarioId(
+                "temario-uuid-456", "profesor@katedra.com");
+
+        assertThat(response.contenidoFuente()).isEqualTo("## Temario manual generado por IA");
+    }
+
+    @Test
+    void shouldRejectSourceAccessFromAnotherUser() {
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                contenidoTemarioService.getFuenteByTemarioId(
+                        "temario-uuid-456", "other@katedra.com"));
+
+        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        verify(contenidoTemarioRepository, never()).findByTemarioId(anyString());
+    }
+
     // --- generarMaterial: validación de request ---
 
     @Test
@@ -195,6 +241,7 @@ class ContenidoTemarioServiceTest {
         assertThat(response.teoria()).isEqualTo("## Teoría existente");
         assertThat(response.diapositivas()).isNull();
         assertThat(response.modelo()).isEqualTo("flash");
+        verify(usuarioRepository).incrementAiGenerationCount(mockUsuario.getId(), 1L);
 
         verify(aiContentGeneratorService, never())
                 .generarTeoria(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class));
@@ -244,6 +291,7 @@ class ContenidoTemarioServiceTest {
         verify(aiContentGeneratorService)
                 .generarEvaluacion(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class));
         verify(contenidoTemarioRepository).save(existing);
+        verify(usuarioRepository).incrementAiGenerationCount(mockUsuario.getId(), 1L);
     }
 
     // --- generarMaterial: fundamentación en teoría ---

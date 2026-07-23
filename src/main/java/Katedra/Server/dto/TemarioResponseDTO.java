@@ -7,7 +7,9 @@ public record TemarioResponseDTO(
     String titulo,
     String descripcion,
     String gradoAcademico,
+    String asignaturaId,
     String asignatura,
+    boolean favorito,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {}

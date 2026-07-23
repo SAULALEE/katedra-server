@@ -10,6 +10,64 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PromptTemplatesTest {
 
     @Test
+    void shouldDefineDistinctBasicAndAdvancedTemarioProfiles() {
+        String basico = PromptTemplates.buildTeoriaSystemPrompt(
+                ModeloIA.BASICO, NivelAcademico.UNIVERSITARIO);
+        String avanzado = PromptTemplates.buildTeoriaSystemPrompt(
+                ModeloIA.AVANZADO, NivelAcademico.UNIVERSITARIO);
+
+        assertThat(basico)
+                .containsIgnoringCase("breve")
+                .containsIgnoringCase("información académica esencial");
+        assertThat(avanzado)
+                .containsIgnoringCase("desarrollo completo")
+                .containsIgnoringCase("conceptos")
+                .containsIgnoringCase("ejemplos")
+                .containsIgnoringCase("actividades")
+                .containsIgnoringCase("recursos");
+        assertThat(basico).isNotEqualTo(avanzado);
+    }
+
+    @Test
+    void shouldForbidConversationalAndMetaAiTextInGeneratedTemario() {
+        String basico = PromptTemplates.buildTeoriaSystemPrompt(
+                ModeloIA.BASICO, NivelAcademico.SECUNDARIA);
+        String avanzado = PromptTemplates.buildTeoriaSystemPrompt(
+                ModeloIA.AVANZADO, NivelAcademico.SECUNDARIA);
+
+        assertThat(basico).contains(
+                "Nunca respondas como un asistente conversacional",
+                "No incluyas saludos",
+                "despedidas",
+                "Aquí tienes",
+                "explicaciones sobre la IA",
+                "EXCLUSIVAMENTE contenido académico");
+        assertThat(avanzado).contains(
+                "Nunca respondas como un asistente conversacional",
+                "No incluyas saludos",
+                "despedidas",
+                "Aquí tienes",
+                "explicaciones sobre la IA",
+                "EXCLUSIVAMENTE contenido académico");
+    }
+
+    @Test
+    void shouldUseProvidedSourceAsPrimaryAndOnlyComplementWhenInsufficient() {
+        String systemPrompt = PromptTemplates.buildTeoriaSystemPrompt(
+                ModeloIA.AVANZADO, NivelAcademico.UNIVERSITARIO);
+        String userPrompt = PromptTemplates.buildUserPrompt(
+                "Programación", "Pilas", "Universitario", "Texto extraído de la fuente");
+
+        assertThat(systemPrompt)
+                .containsIgnoringCase("fuente principal")
+                .containsIgnoringCase("solo complementa")
+                .containsIgnoringCase("insuficiente");
+        assertThat(userPrompt)
+                .contains("Texto extraído de la fuente")
+                .containsIgnoringCase("referencia principal");
+    }
+
+    @Test
     void shouldFollowFlexibleSpineInTeoriaSystemPrompt() {
         String prompt = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.PRO, NivelAcademico.UNIVERSITARIO);
 

@@ -2,13 +2,14 @@ package Katedra.Server.service;
 
 import Katedra.Server.dto.TemarioRequestDTO;
 import Katedra.Server.dto.TemarioResponseDTO;
-import Katedra.Server.dto.TemarioDriveRequestDTO;
 import Katedra.Server.dto.TemarioUrlRequestDTO;
+import Katedra.Server.model.Asignatura;
 import Katedra.Server.model.NivelAcademico;
 import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.ContenidoTemario;
 import Katedra.Server.model.Temario;
 import Katedra.Server.model.Usuario;
+import Katedra.Server.repository.AsignaturaRepository;
 import Katedra.Server.repository.ContenidoTemarioRepository;
 import Katedra.Server.repository.TemarioRepository;
 import Katedra.Server.repository.UsuarioRepository;
@@ -19,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -40,6 +42,9 @@ class TemarioServiceTest {
     private TemarioRepository temarioRepository;
 
     @Mock
+    private AsignaturaRepository asignaturaRepository;
+
+    @Mock
     private UsuarioRepository usuarioRepository;
 
     @Mock
@@ -51,13 +56,11 @@ class TemarioServiceTest {
     @Mock
     private TemarioUrlExtractionService temarioUrlExtractionService;
 
-    @Mock
-    private TemarioGoogleDriveDownloadService temarioGoogleDriveDownloadService;
-
     @InjectMocks
     private TemarioService temarioService;
 
     private Usuario mockUsuario;
+    private Asignatura mockAsignatura;
     private Temario mockTemario;
 
     @BeforeEach
@@ -65,10 +68,20 @@ class TemarioServiceTest {
         mockUsuario = new Usuario("profesor@katedra.com", "securepassword", "Saul", RolUsuario.ROLE_PROFESOR);
         ReflectionTestUtils.setField(mockUsuario, "id", "user-uuid-123");
 
-        mockTemario = new Temario(mockUsuario, "Curso de Spring Boot", "Temario completo de Spring Boot", "universitario", "Programacion");
+        mockAsignatura = new Asignatura(mockUsuario, "Programacion", "Asignatura de desarrollo");
+        ReflectionTestUtils.setField(mockAsignatura, "id", "asignatura-1");
+        mockTemario = new Temario(
+                mockUsuario,
+                "Curso de Spring Boot",
+                "Temario completo de Spring Boot",
+                "universitario",
+                mockAsignatura);
         mockTemario.setId("temario-uuid-456");
         mockTemario.setCreatedAt(LocalDateTime.now());
         mockTemario.setUpdatedAt(LocalDateTime.now());
+        org.mockito.Mockito.lenient()
+                .when(asignaturaRepository.findByIdAndUsuarioEmail("asignatura-1", mockUsuario.getEmail()))
+                .thenReturn(Optional.of(mockAsignatura));
     }
 
     @Test
@@ -78,7 +91,7 @@ class TemarioServiceTest {
                 "Curso de Spring Boot",
                 "Temario completo de Spring Boot",
                 "universitario",
-                "Programacion"
+                "asignatura-1"
         );
         given(usuarioRepository.findByEmail(mockUsuario.getEmail())).willReturn(Optional.of(mockUsuario));
         given(temarioRepository.save(any(Temario.class))).willReturn(mockTemario);
@@ -93,6 +106,7 @@ class TemarioServiceTest {
         assertThat(response.descripcion()).isEqualTo("Temario completo de Spring Boot");
         assertThat(response.gradoAcademico()).isEqualTo("universitario");
         assertThat(response.asignatura()).isEqualTo("Programacion");
+        assertThat(response.favorito()).isFalse();
 
         verify(usuarioRepository).findByEmail(mockUsuario.getEmail());
         verify(temarioRepository).save(any(Temario.class));
@@ -100,11 +114,30 @@ class TemarioServiceTest {
     }
 
     @Test
+    void shouldMaintainAsignaturaToTemariosRelationship() {
+        assertThat(mockAsignatura.getTemarios()).containsExactly(mockTemario);
+        assertThat(mockTemario.getAsignatura()).isSameAs(mockAsignatura);
+    }
+
+    @Test
+    void shouldRejectMultipleAcademicGradesAtServiceBoundary() {
+        TemarioRequestDTO request = new TemarioRequestDTO(
+                "Curso", "Contenido", "Primaria, Universidad", "asignatura-1");
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> temarioService.createTemario(mockUsuario.getEmail(), request));
+
+        assertThat(exception.getStatusCode().value()).isEqualTo(400);
+        assertThat(exception.getReason()).isEqualTo("Solo se permite un grado académico");
+        verify(temarioRepository, never()).save(any(Temario.class));
+    }
+
+    @Test
     void shouldUpdateOwnedTemarioUsingExistingContract() {
         given(temarioRepository.findById(mockTemario.getId())).willReturn(Optional.of(mockTemario));
         given(temarioRepository.save(mockTemario)).willReturn(mockTemario);
         TemarioRequestDTO request = new TemarioRequestDTO(
-                "Spring actualizado", "Nueva descripción", "Posgrado", "Arquitectura");
+                "Spring actualizado", "Nueva descripción", "Posgrado", "asignatura-1");
 
         TemarioResponseDTO response = temarioService.updateTemario(
                 mockTemario.getId(), mockUsuario.getEmail(), request);
@@ -112,7 +145,7 @@ class TemarioServiceTest {
         assertThat(response.titulo()).isEqualTo("Spring actualizado");
         assertThat(response.descripcion()).isEqualTo("Nueva descripción");
         assertThat(response.gradoAcademico()).isEqualTo("Posgrado");
-        assertThat(response.asignatura()).isEqualTo("Arquitectura");
+        assertThat(response.asignatura()).isEqualTo("Programacion");
         verify(temarioRepository).save(mockTemario);
     }
 
@@ -123,7 +156,7 @@ class TemarioServiceTest {
                 "Curso de Spring Boot",
                 "Temario completo de Spring Boot",
                 "universitario",
-                "Programacion"
+                "asignatura-1"
         );
         given(usuarioRepository.findByEmail("unknown@katedra.com")).willReturn(Optional.empty());
 
@@ -171,31 +204,61 @@ class TemarioServiceTest {
     }
 
     @Test
-    void shouldGetUniqueAsignaturasForAuthenticatedUser() {
+    void shouldMarkOwnedTemarioAsFavorite() {
+        given(temarioRepository.findById(mockTemario.getId())).willReturn(Optional.of(mockTemario));
+        given(temarioRepository.save(mockTemario)).willReturn(mockTemario);
+
+        TemarioResponseDTO response = temarioService.updateFavorito(
+                mockTemario.getId(), mockUsuario.getEmail(), true);
+
+        assertThat(response.favorito()).isTrue();
+        assertThat(mockTemario.isFavorito()).isTrue();
+        verify(temarioRepository).save(mockTemario);
+    }
+
+    @Test
+    void shouldUnmarkOwnedTemarioAsFavorite() {
+        mockTemario.setFavorito(true);
+        given(temarioRepository.findById(mockTemario.getId())).willReturn(Optional.of(mockTemario));
+        given(temarioRepository.save(mockTemario)).willReturn(mockTemario);
+
+        TemarioResponseDTO response = temarioService.updateFavorito(
+                mockTemario.getId(), mockUsuario.getEmail(), false);
+
+        assertThat(response.favorito()).isFalse();
+        assertThat(mockTemario.isFavorito()).isFalse();
+    }
+
+    @Test
+    void shouldListOnlyAuthenticatedUserFavorites() {
+        mockTemario.setFavorito(true);
         given(usuarioRepository.findByEmail(mockUsuario.getEmail())).willReturn(Optional.of(mockUsuario));
-        given(temarioRepository.findDistinctAsignaturasByUsuarioId(mockUsuario.getId()))
-                .willReturn(List.of("Arquitectura", "Programacion"));
+        given(temarioRepository.findByUsuarioIdAndFavoritoTrueOrderByCreatedAtAsc(mockUsuario.getId()))
+                .willReturn(List.of(mockTemario));
 
-        List<String> asignaturas = temarioService.getAsignaturasByUser(mockUsuario.getEmail());
+        List<TemarioResponseDTO> favoritos =
+                temarioService.getFavoritosByUser(mockUsuario.getEmail());
 
-        assertThat(asignaturas).containsExactly("Arquitectura", "Programacion");
-        verify(temarioRepository).findDistinctAsignaturasByUsuarioId(mockUsuario.getId());
+        assertThat(favoritos).singleElement()
+                .satisfies(temario -> assertThat(temario.favorito()).isTrue());
+        verify(temarioRepository)
+                .findByUsuarioIdAndFavoritoTrueOrderByCreatedAtAsc(mockUsuario.getId());
     }
 
     @Test
     void shouldGetOnlyAuthenticatedUserTemariosForAsignatura() {
         given(usuarioRepository.findByEmail(mockUsuario.getEmail())).willReturn(Optional.of(mockUsuario));
-        given(temarioRepository.findByUsuarioIdAndAsignaturaOrderByCreatedAtAsc(
-                mockUsuario.getId(), "Programacion"))
+        given(temarioRepository.findByUsuarioIdAndAsignaturaIdOrderByCreatedAtAsc(
+                mockUsuario.getId(), "asignatura-1"))
                 .willReturn(List.of(mockTemario));
 
         List<TemarioResponseDTO> temarios = temarioService.getTemariosByAsignatura(
-                mockUsuario.getEmail(), "Programacion");
+                mockUsuario.getEmail(), "asignatura-1");
 
         assertThat(temarios).singleElement()
                 .satisfies(temario -> assertThat(temario.asignatura()).isEqualTo("Programacion"));
-        verify(temarioRepository).findByUsuarioIdAndAsignaturaOrderByCreatedAtAsc(
-                mockUsuario.getId(), "Programacion");
+        verify(temarioRepository).findByUsuarioIdAndAsignaturaIdOrderByCreatedAtAsc(
+                mockUsuario.getId(), "asignatura-1");
     }
 
     @Test
@@ -253,6 +316,18 @@ class TemarioServiceTest {
         // Assert
         verify(temarioRepository).findById(mockTemario.getId());
         verify(contenidoTemarioRepository).delete(contenido);
+        verify(temarioRepository).delete(mockTemario);
+    }
+
+    @Test
+    void shouldDeleteFavoriteTemarioWithoutAdditionalFavoriteRecords() {
+        mockTemario.setFavorito(true);
+        given(temarioRepository.findById(mockTemario.getId())).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId(mockTemario.getId()))
+                .willReturn(Optional.empty());
+
+        temarioService.deleteTemario(mockTemario.getId(), mockUsuario.getEmail());
+
         verify(temarioRepository).delete(mockTemario);
     }
 
@@ -321,43 +396,34 @@ class TemarioServiceTest {
         });
 
         var response = temarioService.cargarTemarioArchivo(
-                mockUsuario.getEmail(), file, "Curso de Spring Boot", "Programacion", "universitario");
+                mockUsuario.getEmail(), file, "Curso de Spring Boot", "asignatura-1", "universitario");
 
         assertThat(response.temario().id()).isEqualTo("temario-uuid-456");
         assertThat(response.contenidoId()).isEqualTo("contenido-uuid-789");
         assertThat(response.archivoNombre()).isEqualTo("temario.md");
         assertThat(response.caracteresExtraidos()).isEqualTo(9);
-        verify(contenidoTemarioRepository).save(any(ContenidoTemario.class));
+        verify(contenidoTemarioRepository).save(argThat(contenido ->
+                "# Temario".equals(contenido.getTeoria())
+                        && "# Temario".equals(contenido.getContenidoFuente())));
     }
 
     @Test
-    void shouldAcceptCommaSeparatedAcademicGradesWhenLoadingFile() {
+    void shouldRejectCommaSeparatedAcademicGradesWhenLoadingFile() {
         var file = new org.springframework.mock.web.MockMultipartFile(
                 "file", "temario.md", "text/markdown", "# Temario".getBytes());
-        var extracted = new TemarioFileExtractionService.ExtractedTemarioFile(
-                "temario.md", "text/markdown", "# Temario");
-        given(usuarioRepository.findByEmail(mockUsuario.getEmail())).willReturn(Optional.of(mockUsuario));
-        given(temarioFileExtractionService.extract(file)).willReturn(extracted);
-        given(temarioRepository.save(any(Temario.class))).willReturn(mockTemario);
-        given(contenidoTemarioRepository.save(any(ContenidoTemario.class))).willAnswer(invocation -> {
-            ContenidoTemario saved = invocation.getArgument(0);
-            saved.setId("contenido-uuid-792");
-            return saved;
-        });
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> temarioService.cargarTemarioArchivo(
+                        mockUsuario.getEmail(), file, "Curso", "asignatura-1",
+                        "Primaria, Universidad, Diplomado de programacion"));
 
-        var response = temarioService.cargarTemarioArchivo(
-                mockUsuario.getEmail(), file, "Curso", "Programacion",
-                "Primaria, Universidad, Diplomado de programacion");
-
-        assertThat(response.contenidoId()).isEqualTo("contenido-uuid-792");
-        verify(temarioRepository).save(argThat(temario ->
-                "Primaria, Universidad, Diplomado de programacion".equals(temario.getGradoAcademico())));
+        assertThat(exception.getReason()).isEqualTo("Solo se permite un grado académico");
+        verify(temarioFileExtractionService, never()).extract(file);
     }
 
     @Test
     void shouldLoadTemarioFromExtractedUrl() {
         var request = new TemarioUrlRequestDTO(
-                "https://example.com/temario", "Temario Web", "Programacion", "universitario");
+                "https://example.com/temario", "Temario Web", "asignatura-1", "universitario");
         var extracted = new TemarioUrlExtractionService.ExtractedTemarioUrl(
                 "https://example.com/temario", "Example Title", "Contenido web limpio");
         given(usuarioRepository.findByEmail(mockUsuario.getEmail())).willReturn(Optional.of(mockUsuario));
@@ -376,35 +442,9 @@ class TemarioServiceTest {
         assertThat(response.fuenteUrl()).isEqualTo("https://example.com/temario");
         assertThat(response.archivoNombre()).isNull();
         assertThat(response.caracteresExtraidos()).isEqualTo(20);
-        verify(contenidoTemarioRepository).save(any(ContenidoTemario.class));
+        verify(contenidoTemarioRepository).save(argThat(contenido ->
+                "Contenido web limpio".equals(contenido.getTeoria())
+                        && "Contenido web limpio".equals(contenido.getContenidoFuente())));
     }
 
-    @Test
-    void shouldLoadTemarioFromPublicDriveLink() {
-        var request = new TemarioDriveRequestDTO(
-                "https://drive.google.com/file/d/file-123/view", "Temario Drive", "Programacion", "universitario");
-        var file = new org.springframework.mock.web.MockMultipartFile(
-                "file", "drive-temario.md", "text/markdown", "# Drive".getBytes());
-        var downloaded = new TemarioGoogleDriveDownloadService.DownloadedDriveFile("file-123", file);
-        var extracted = new TemarioFileExtractionService.ExtractedTemarioFile(
-                "drive-temario.md", "text/markdown", "# Drive");
-        given(usuarioRepository.findByEmail(mockUsuario.getEmail())).willReturn(Optional.of(mockUsuario));
-        given(temarioGoogleDriveDownloadService.download(request.url())).willReturn(downloaded);
-        given(temarioFileExtractionService.extract(file)).willReturn(extracted);
-        given(temarioRepository.save(any(Temario.class))).willReturn(mockTemario);
-        given(contenidoTemarioRepository.save(any(ContenidoTemario.class))).willAnswer(invocation -> {
-            ContenidoTemario saved = invocation.getArgument(0);
-            saved.setId("contenido-uuid-791");
-            return saved;
-        });
-
-        var response = temarioService.cargarTemarioDrive(mockUsuario.getEmail(), request);
-
-        assertThat(response.temario().id()).isEqualTo("temario-uuid-456");
-        assertThat(response.contenidoId()).isEqualTo("contenido-uuid-791");
-        assertThat(response.archivoNombre()).isEqualTo("drive-temario.md");
-        assertThat(response.fuenteUrl()).isEqualTo("https://drive.google.com/file/d/file-123/view");
-        assertThat(response.caracteresExtraidos()).isEqualTo(7);
-        verify(contenidoTemarioRepository).save(any(ContenidoTemario.class));
-    }
 }

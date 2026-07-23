@@ -2,18 +2,21 @@ package Katedra.Server.service;
 
 import Katedra.Server.dto.AssistantRequestDTO;
 import Katedra.Server.dto.AssistantResponseDTO;
+import Katedra.Server.model.Asignatura;
 import Katedra.Server.model.AssistantQuickAction;
 import Katedra.Server.model.ContenidoTemario;
 import Katedra.Server.model.ModeloIA;
 import Katedra.Server.model.NivelAcademico;
 import Katedra.Server.model.Temario;
 import Katedra.Server.model.Usuario;
+import Katedra.Server.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.concurrent.ExecutionException;
@@ -23,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -43,6 +47,9 @@ class AssistantServiceTest {
     @Mock
     private ContenidoTemarioService contenidoTemarioService;
 
+    @Mock
+    private UsuarioRepository usuarioRepository;
+
     private AssistantService service;
 
     // Runs supplyAsync's task synchronously on the calling thread so tests stay deterministic
@@ -52,13 +59,17 @@ class AssistantServiceTest {
     @BeforeEach
     void setUp() {
         given(chatClientBuilder.build()).willReturn(chatClient);
-        service = new AssistantService(chatClientBuilder, contenidoTemarioService, SYNC_EXECUTOR);
+        service = new AssistantService(
+                chatClientBuilder, contenidoTemarioService, usuarioRepository, SYNC_EXECUTOR);
     }
 
     private ContenidoTemario contenidoConTeoria(String teoria) {
         Usuario usuario = new Usuario();
         usuario.setEmail(USER_EMAIL);
-        Temario temario = new Temario(usuario, "Pilas", "Pilas y colas", "universitario", "Programacion");
+        ReflectionTestUtils.setField(usuario, "id", "usuario-1");
+        Asignatura asignatura = new Asignatura(usuario, "Programacion", null);
+        ReflectionTestUtils.setField(asignatura, "id", "asignatura-1");
+        Temario temario = new Temario(usuario, "Pilas", "Pilas y colas", "universitario", asignatura);
         ContenidoTemario contenido = new ContenidoTemario(temario);
         contenido.setTeoria(teoria);
         contenido.setModelo(ModeloIA.FLASH.getValor());
@@ -87,6 +98,7 @@ class AssistantServiceTest {
         assertThat(response.content()).isEqualTo("## Teoría acortada.");
         assertThat(response.modeloUsed()).isEqualTo(ModeloIA.BASICO);
         verify(contenidoTemarioService).guardarTeoria(contenido, "## Teoría acortada.");
+        verify(usuarioRepository).incrementAiGenerationCount("usuario-1", 1L);
     }
 
     @Test
@@ -99,6 +111,7 @@ class AssistantServiceTest {
         assertThat(response.modeloUsed()).isNull();
         verify(contenidoTemarioService, never()).getContenidoOwned(anyString(), anyString());
         verify(contenidoTemarioService, never()).guardarTeoria(any(), anyString());
+        verify(usuarioRepository, never()).incrementAiGenerationCount(anyString(), anyLong());
     }
 
     @Test
@@ -109,6 +122,7 @@ class AssistantServiceTest {
 
         assertThat(response.corregido()).isFalse();
         verify(contenidoTemarioService, never()).getContenidoOwned(anyString(), anyString());
+        verify(usuarioRepository, never()).incrementAiGenerationCount(anyString(), anyLong());
     }
 
     @Test
@@ -178,5 +192,6 @@ class AssistantServiceTest {
 
         assertThat(response.corregido()).isFalse();
         verify(contenidoTemarioService, never()).guardarTeoria(any(), anyString());
+        verify(usuarioRepository, never()).incrementAiGenerationCount(anyString(), anyLong());
     }
 }

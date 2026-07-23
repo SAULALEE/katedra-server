@@ -64,6 +64,7 @@ public class WebSecurityConfig {
                 // ROLE_ADMIN: user management only
                 .requestMatchers("/usuarios/**").hasRole("ADMIN")
                 // ROLE_PROFESOR: academic features only
+                .requestMatchers("/asignaturas/**").hasRole("PROFESOR")
                 .requestMatchers("/temarios/**").hasRole("PROFESOR")
                 .requestMatchers("/assistant/**").hasRole("PROFESOR")
                 // Deny everything else

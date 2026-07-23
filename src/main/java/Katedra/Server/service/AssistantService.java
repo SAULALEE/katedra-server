@@ -8,6 +8,7 @@ import Katedra.Server.model.AssistantQuickAction;
 import Katedra.Server.model.ContenidoTemario;
 import Katedra.Server.model.ModeloIA;
 import Katedra.Server.model.NivelAcademico;
+import Katedra.Server.repository.UsuarioRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -79,12 +80,17 @@ public class AssistantService {
 
     private final ChatClient chatClient;
     private final ContenidoTemarioService contenidoTemarioService;
+    private final UsuarioRepository usuarioRepository;
     private final Executor executor;
 
     public AssistantService(
-            ChatClient.Builder chatClientBuilder, ContenidoTemarioService contenidoTemarioService, Executor executor) {
+            ChatClient.Builder chatClientBuilder,
+            ContenidoTemarioService contenidoTemarioService,
+            UsuarioRepository usuarioRepository,
+            Executor executor) {
         this.chatClient = chatClientBuilder.build();
         this.contenidoTemarioService = contenidoTemarioService;
+        this.usuarioRepository = usuarioRepository;
         this.executor = executor;
     }
 
@@ -136,6 +142,8 @@ public class AssistantService {
                         return new AssistantResponseDTO(MENSAJE_ERROR, MODELO_CORRECCION, action, false);
                     }
                     contenidoTemarioService.guardarTeoria(contenido, teoriaCorregida);
+                    usuarioRepository.incrementAiGenerationCount(
+                            contenido.getTemario().getUsuario().getId(), 1L);
                     return new AssistantResponseDTO(teoriaCorregida, MODELO_CORRECCION, action, true);
                 });
     }

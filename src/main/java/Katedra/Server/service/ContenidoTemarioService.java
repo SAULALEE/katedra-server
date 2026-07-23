@@ -1,6 +1,7 @@
 package Katedra.Server.service;
 
 import Katedra.Server.dto.ContenidoTemarioResponseDTO;
+import Katedra.Server.dto.ContenidoFuenteResponseDTO;
 import Katedra.Server.dto.DiapositivaDTO;
 import Katedra.Server.dto.EvaluacionPreguntaDTO;
 import Katedra.Server.dto.GenerarMaterialRequestDTO;
@@ -57,6 +58,22 @@ public class ContenidoTemarioService {
         return mapToDTO(entity, Map.of());
     }
 
+    @Transactional(readOnly = true)
+    public ContenidoFuenteResponseDTO getFuenteByTemarioId(String temarioId, String userEmail) {
+        findOwnedTemario(temarioId, userEmail);
+        ContenidoTemario entity = contenidoTemarioRepository.findByTemarioId(temarioId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Contenido fuente no disponible"));
+        String fuente = entity.getContenidoFuente();
+        if (fuente == null || fuente.isBlank()) {
+            fuente = entity.getTeoria();
+        }
+        if (fuente == null || fuente.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contenido fuente no disponible");
+        }
+        return new ContenidoFuenteResponseDTO(temarioId, fuente);
+    }
+
     /**
      * Generates every requested piece, always overwriting any existing content for it.
      */
@@ -96,7 +113,11 @@ public class ContenidoTemarioService {
         // output can be reused; otherwise the already-persisted theory is reused as-is.
         CompletableFuture<String> teoriaFuture = generaTeoriaAhora
                 ? aiContentGeneratorService.generarTeoria(
-                        temario.getAsignatura(), temario.getTitulo(), nivelGeneracion, fuente, modeloTier)
+                        temario.getAsignatura().getNombre(),
+                        temario.getTitulo(),
+                        nivelGeneracion,
+                        fuente,
+                        modeloTier)
                 : CompletableFuture.completedFuture(teoriaGuardada);
 
         Map<PiezaMaterial, CompletableFuture<?>> futures = new EnumMap<>(PiezaMaterial.class);
@@ -199,7 +220,7 @@ public class ContenidoTemarioService {
     private CompletableFuture<?> dispatch(
             PiezaMaterial pieza, Temario temario, CompletableFuture<String> teoriaFuture,
             ModeloIA modeloTier, int numeroDiapositivas) {
-        String asignatura = temario.getAsignatura();
+        String asignatura = temario.getAsignatura().getNombre();
         String titulo = temario.getTitulo();
         String grado = temario.getGradoAcademico();
         NivelAcademico nivel = NivelAcademico.fromGradoAcademico(grado);
