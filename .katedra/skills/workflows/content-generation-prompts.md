@@ -56,26 +56,27 @@ the user prompt — the level must never be silently defaulted or dropped. The s
 must read differently across levels; if two levels produce near-identical prose, the
 prompt is under-specified.
 
-## 5. `ModeloIA` — three branded tiers, not raw model ids
+## 5. `ModeloIA` — two branded tiers, not raw model ids
 The API and persisted data (`ContenidoTemario.modelo`) expose only the **tier key**
-(`flash`/`pro`/`max`), never a raw OpenAI model id — keeps the contract provider-agnostic
+(`flash`/`pro`), never a raw OpenAI model id — keeps the contract provider-agnostic
 (Spring AI can swap providers with a config change) and avoids leaking implementation
 details to clients.
 
-| Tier | Display name | Model | Teoría párrafos | Ejercicios | Preguntas examen | Options |
+| Tier | Display name | Model | Teoría párrafos | Preguntas examen | Diapositivas | Options |
 |---|---|---|---|---|---|---|
-| `FLASH` | Tutor | `gpt-4.1-mini` | 6–10 | 5 | 5 | temperature 0.5, maxTokens 2500 |
-| `PRO` | Maestro | `gpt-5.4` | 10–18 | 10 | 10 | reasoningEffort=medium, maxCompletionTokens 6500 |
-| `MAX` | Catedrático | `o4-mini` (reasoning) | 12–20 | 15–20 | 15–20 | reasoningEffort=medium, **no temperature**, maxCompletionTokens 12000 |
+| `FLASH` | Tutor | `gpt-4.1-mini` | 5–15 (default 8) | 1–10 (default 5) | 5–10 (default 8) | temperature 0.5, maxTokens 2500 |
+| `PRO` | Catedrático | `o4-mini` (reasoning) | 20–40 (default 20), capped at 5000 words | 15–30 (default 20) | 10–20 (default 15) | reasoningEffort=medium, **no temperature**, maxCompletionTokens 12000 |
 
-Each tier also carries `estiloEjercicios` (independent from `estiloTeoria`): Tutor is
-rápido y directo, Maestro razonado y analítico, Catedrático práctico y lógico-matemático
-with the best questions selected rather than the max count reached for its own sake.
+The exact paragraph/question/slide count within each tier's range is user-selectable per
+request (`GenerarMaterialRequestDTO.numeroParrafos`/`numeroPreguntas`/`numeroDiapositivas`);
+a null value falls back to the tier's default. `ContenidoTemarioService` validates the
+requested value against the selected tier's `[min, max]` before dispatching, rejecting
+out-of-range values with 400.
 
 **Avoid wasting tokens:** reasoning models bill hidden "thinking" tokens in addition to
-the visible answer (a 500-token answer can consume 2000+ total tokens). Only `MAX` uses
+the visible answer (a 500-token answer can consume 2000+ total tokens). Only `PRO` uses
 a reasoning model, with a bounded `reasoningEffort` and `maxCompletionTokens` cap — never
-let a cheap tier accidentally call a reasoning model, and never set `temperature` on a
+let the cheap tier accidentally call a reasoning model, and never set `temperature` on a
 reasoning-tier call (the API rejects it).
 
 ## 6. Response format strategy

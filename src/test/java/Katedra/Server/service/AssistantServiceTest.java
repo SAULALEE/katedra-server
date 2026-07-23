@@ -151,13 +151,13 @@ class AssistantServiceTest {
 
     @Test
     void shouldAlwaysUseFlashRegardlessOfRequestedModel() throws ExecutionException, InterruptedException {
-        // Corrections must never route to a reasoning tier (30-90s+): the requested MAX tier
+        // Corrections must never route to a reasoning tier (30-90s+): the requested PRO tier
         // is ignored and the call always runs on FLASH, the fast non-reasoning model.
         ContenidoTemario contenido = contenidoConTeoria("## Teoría original.");
         given(contenidoTemarioService.getContenidoOwned(TEMARIO_ID, USER_EMAIL)).willReturn(contenido);
         stubContent("## Teoría corregida.");
 
-        AssistantRequestDTO request = new AssistantRequestDTO(TEMARIO_ID, AssistantQuickAction.ACORTAR, null, ModeloIA.MAX);
+        AssistantRequestDTO request = new AssistantRequestDTO(TEMARIO_ID, AssistantQuickAction.ACORTAR, null, ModeloIA.PRO);
         AssistantResponseDTO response = service.corregir(TEMARIO_ID, USER_EMAIL, request).get();
 
         assertThat(response.modeloUsed()).isEqualTo(ModeloIA.FLASH);

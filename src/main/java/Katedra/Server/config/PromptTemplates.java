@@ -40,38 +40,33 @@ public final class PromptTemplates {
 
     private static final PromptTemplate CORRECCION_USER_TEMPLATE = loadTemplate("correccion-user.st");
 
-    public static String buildTeoriaSystemPrompt(ModeloIA modelo, NivelAcademico nivel) {
+    public static String buildTeoriaSystemPrompt(ModeloIA modelo, NivelAcademico nivel, int numeroParrafos) {
         return TEORIA_SYSTEM_TEMPLATE.render(Map.of(
                 "katedraContext", KATEDRA_CONTEXT,
                 "nivelRubrica", nivel.getRubrica(),
                 "estiloTeoria", modelo.getEstiloTeoria(),
-                "parrafosInstruccion", buildCantidadInstruccion(
-                        modelo.getMinParrafosTeoria(), modelo.getMaxParrafosTeoria(), "párrafos")));
+                "parrafosInstruccion", buildParrafosInstruccion(numeroParrafos, modelo.getMaxPalabrasTeoria())));
     }
 
-    public static String buildEvaluacionSystemPrompt(ModeloIA modelo, NivelAcademico nivel) {
+    public static String buildEvaluacionSystemPrompt(ModeloIA modelo, NivelAcademico nivel, int numeroPreguntas) {
         return EVALUACION_SYSTEM_TEMPLATE.render(Map.of(
                 "katedraContext", KATEDRA_CONTEXT,
                 "nivelRubrica", nivel.getRubrica(),
                 "estiloEvaluacion", modelo.getEstiloEvaluacion(),
-                "cantidadInstruccion", buildCantidadInstruccion(
-                        modelo.getMinPreguntas(), modelo.getMaxPreguntas(), "preguntas")));
+                "cantidadInstruccion", "Genera exactamente " + numeroPreguntas + " preguntas en total."));
     }
 
     /**
-     * Renders the exact wording for a count instruction (paragraphs, exercises,
-     * questions) in Java rather than in each .st template, since the phrasing branches
-     * on whether the tier has a fixed count (min == max) or a range (e.g. Catedrático's
-     * 15-20).
+     * Renders the paragraph-count instruction for the user-selected (or tier-default)
+     * count, appending a total word ceiling for tiers that define one (e.g. Catedrático's
+     * 5000-word cap), since a high paragraph target alone doesn't bound total length.
      */
-    private static String buildCantidadInstruccion(int min, int max, String sustantivo) {
-        if (min == max) {
-            return "Genera exactamente " + min + " " + sustantivo + " en total.";
+    private static String buildParrafosInstruccion(int numeroParrafos, Integer maxPalabras) {
+        String instruccion = "Genera exactamente " + numeroParrafos + " párrafos en total.";
+        if (maxPalabras != null) {
+            instruccion += " El desarrollo completo no debe exceder " + maxPalabras + " palabras en total.";
         }
-        return "Genera entre " + min + " y " + max + " " + sustantivo + " en total, elige la "
-                + "cantidad según la amplitud real del tema (temas simples cerca del mínimo, "
-                + "temas amplios cerca del máximo) — nunca sacrifiques la calidad por alcanzar "
-                + "el máximo.";
+        return instruccion;
     }
 
     /**

@@ -35,11 +35,13 @@ public class AiContentGeneratorService {
 
     @Async
     public CompletableFuture<String> generarTeoria(
-            String asignatura, String titulo, NivelAcademico nivel, String fuente, ModeloIA modelo) {
+            String asignatura, String titulo, NivelAcademico nivel, String fuente, ModeloIA modelo,
+            int numeroParrafos) {
         try {
-            log.info("Generando teoría [{}] para tema: {} (nivel {})", modelo.getDisplayName(), titulo, nivel.getEtiqueta());
+            log.info("Generando teoría [{}] ({} párrafos) para tema: {} (nivel {})",
+                    modelo.getDisplayName(), numeroParrafos, titulo, nivel.getEtiqueta());
             String texto = chatClient.prompt()
-                    .system(PromptTemplates.buildTeoriaSystemPrompt(modelo, nivel))
+                    .system(PromptTemplates.buildTeoriaSystemPrompt(modelo, nivel, numeroParrafos))
                     .user(PromptTemplates.buildUserPrompt(asignatura, titulo, nivel.getEtiqueta(), fuente))
                     .options(OpenAiOptionsFactory.forModelo(modelo))
                     .call()
@@ -58,11 +60,13 @@ public class AiContentGeneratorService {
      */
     @Async
     public CompletableFuture<List<EvaluacionPreguntaDTO>> generarEvaluacion(
-            String asignatura, String titulo, NivelAcademico nivel, String teoriaTexto, ModeloIA modelo) {
+            String asignatura, String titulo, NivelAcademico nivel, String teoriaTexto, ModeloIA modelo,
+            int numeroPreguntas) {
         try {
-            log.info("Generando evaluación [{}] para tema: {} (nivel {})", modelo.getDisplayName(), titulo, nivel.getEtiqueta());
+            log.info("Generando {} preguntas de evaluación [{}] para tema: {} (nivel {})",
+                    numeroPreguntas, modelo.getDisplayName(), titulo, nivel.getEtiqueta());
             List<EvaluacionPreguntaDTO> preguntas = chatClient.prompt()
-                    .system(PromptTemplates.buildEvaluacionSystemPrompt(modelo, nivel))
+                    .system(PromptTemplates.buildEvaluacionSystemPrompt(modelo, nivel, numeroPreguntas))
                     .user(PromptTemplates.buildUserPrompt(asignatura, titulo, nivel.getEtiqueta(), teoriaTexto))
                     .options(OpenAiOptionsFactory.forModelo(modelo))
                     .call()

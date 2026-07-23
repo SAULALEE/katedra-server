@@ -13,9 +13,10 @@ import com.fasterxml.jackson.annotation.JsonValue;
 public enum ModeloIA {
     FLASH(
             "flash", "Tutor", "gpt-4.1-mini",
-            8, 8, 8,
-            3, 5,
-            3, 5,
+            5, 10, 8,
+            5, 15, 10,
+            1, 10, 5,
+            null,
             0.5, 2500, false, null,
             """
             Estilo TUTOR — rápido y directo, pero SIEMPRE completo: el tono es ágil \
@@ -33,33 +34,11 @@ public enum ModeloIA {
             sencillas. Las explicaciones son breves pero completas: siempre \
             justifican la respuesta correcta sin rodeos."""),
     PRO(
-            "pro", "Maestro", "gpt-5.4",
-            15, 15, 15,
-            5, 8,
-            5, 7,
-            null, 6000, true, "low",
-            """
-            Estilo MAESTRO — respuestas razonadas, coherentes y analíticas, con \
-            mucho razonamiento explícito: no te limites a enunciar conceptos, \
-            explica el porqué detrás de cada uno, cómo se conectan entre sí y qué \
-            lo distingue de alternativas cercanas. Anticipa dudas frecuentes, \
-            compara alternativas en profundidad y desarrolla el ejemplo paso a \
-            paso, sin omitir ningún paso del razonamiento. Los párrafos pueden ser \
-            extensos si el tema lo amerita: prioriza la coherencia argumentativa \
-            sobre la brevedad. El desarrollo debe sentirse como la explicación de \
-            un profesor que profundiza muy por encima de lo básico.""",
-            """
-            Estilo MAESTRO — examen razonado y con contexto: la mayoría de las \
-            preguntas plantea una situación concreta o un mini-caso que exige \
-            aplicar y analizar el concepto, no solo recordarlo. Los distractores \
-            encarnan los errores conceptuales típicos del estudiante, y cada \
-            explicación desmonta explícitamente ese error además de justificar \
-            la opción correcta."""),
-    MAX(
-            "max", "Catedrático", "o4-mini",
-            20, 20, 20,
-            8, 12,
-            15, 20,
+            "pro", "Catedrático", "o4-mini",
+            10, 20, 15,
+            20, 40, 20,
+            15, 30, 20,
+            5000,
             null, 12000, true, "medium",
             """
             Estilo CATEDRÁTICO — el nivel más alto y potente posible, con registro \
@@ -71,12 +50,9 @@ public enum ModeloIA {
             denso y completamente desarrollado, que muchos párrafos breves. Un \
             párrafo no termina hasta agotar su idea: justificación formal, \
             matices, comparaciones y ejemplos internos antes de pasar al \
-            siguiente encabezado. No te conformes con igualar el nivel de \
-            Maestro: donde Maestro dedica un párrafo a una idea, tú debes \
-            profundizar esa misma idea con más rigor, más matices, y con un \
-            párrafo notablemente más largo y completo — la extensión y la \
-            profundidad POR PÁRRAFO deben superar claramente a las de Maestro, \
-            nunca ser menores. Desarrolla el contenido en párrafos de prosa \
+            siguiente encabezado. No te conformes con un desarrollo superficial: \
+            profundiza cada idea con rigor, matices, y un párrafo notablemente \
+            largo y completo. Desarrolla el contenido en párrafos de prosa \
             completos y argumentados, NO como una sucesión de listas de \
             viñetas: usa listas solo para enumerar operaciones puntuales cuando \
             sea imprescindible, y aun así explica cada una con la misma densidad \
@@ -87,9 +63,10 @@ public enum ModeloIA {
             plano), errores comunes o antipatrones, y conexiones con temas más \
             avanzados del área. Este es nuestro modelo más potente: su rigor \
             técnico, su atención al detalle y la extensión de cada párrafo \
-            individual deben ser inconfundiblemente superiores a los de Maestro, \
-            de modo que cualquier lector note de inmediato que está ante la \
-            respuesta más completa, profesional y poderosa posible.""",
+            individual deben ser inconfundiblemente superiores a los de un \
+            desarrollo básico, de modo que cualquier lector note de inmediato \
+            que está ante la respuesta más completa, profesional y poderosa \
+            posible.""",
             """
             Estilo CATEDRÁTICO — el examen más riguroso posible: preguntas \
             multi-paso de análisis y diagnóstico, con escenarios realistas, datos \
@@ -107,8 +84,11 @@ public enum ModeloIA {
     private final int defaultDiapositivas;
     private final int minParrafosTeoria;
     private final int maxParrafosTeoria;
+    private final int defaultParrafosTeoria;
     private final int minPreguntas;
     private final int maxPreguntas;
+    private final int defaultPreguntas;
+    private final Integer maxPalabrasTeoria;
     private final Double temperature;
     private final int maxTokens;
     private final boolean reasoning;
@@ -118,8 +98,9 @@ public enum ModeloIA {
 
     ModeloIA(String valor, String displayName, String modelId,
              int minDiapositivas, int maxDiapositivas, int defaultDiapositivas,
-             int minParrafosTeoria, int maxParrafosTeoria,
-             int minPreguntas, int maxPreguntas,
+             int minParrafosTeoria, int maxParrafosTeoria, int defaultParrafosTeoria,
+             int minPreguntas, int maxPreguntas, int defaultPreguntas,
+             Integer maxPalabrasTeoria,
              Double temperature, int maxTokens, boolean reasoning, String reasoningEffort,
              String estiloTeoria, String estiloEvaluacion) {
         this.valor = valor;
@@ -130,8 +111,11 @@ public enum ModeloIA {
         this.defaultDiapositivas = defaultDiapositivas;
         this.minParrafosTeoria = minParrafosTeoria;
         this.maxParrafosTeoria = maxParrafosTeoria;
+        this.defaultParrafosTeoria = defaultParrafosTeoria;
         this.minPreguntas = minPreguntas;
         this.maxPreguntas = maxPreguntas;
+        this.defaultPreguntas = defaultPreguntas;
+        this.maxPalabrasTeoria = maxPalabrasTeoria;
         this.temperature = temperature;
         this.maxTokens = maxTokens;
         this.reasoning = reasoning;
@@ -173,12 +157,25 @@ public enum ModeloIA {
         return maxParrafosTeoria;
     }
 
+    public int getDefaultParrafosTeoria() {
+        return defaultParrafosTeoria;
+    }
+
     public int getMinPreguntas() {
         return minPreguntas;
     }
 
     public int getMaxPreguntas() {
         return maxPreguntas;
+    }
+
+    public int getDefaultPreguntas() {
+        return defaultPreguntas;
+    }
+
+    /** Null unless the tier caps total theory length by word count (e.g. Catedrático's 5000). */
+    public Integer getMaxPalabrasTeoria() {
+        return maxPalabrasTeoria;
     }
 
     /** Null for reasoning tiers: temperature is rejected by o-series and GPT-5 family models. */
@@ -206,9 +203,9 @@ public enum ModeloIA {
 
     /**
      * Tier-specific cognitive style for theory generation (Tutor: quick and direct;
-     * Maestro: reasoned and analytical; Catedrático: most rigorous and in-depth).
-     * Independent of {@link NivelAcademico}, which adapts to the student's grade
-     * level rather than to how deep or fast the chosen tier should reason.
+     * Catedrático: most rigorous and in-depth). Independent of {@link NivelAcademico},
+     * which adapts to the student's grade level rather than to how deep or fast the
+     * chosen tier should reason.
      */
     public String getEstiloTeoria() {
         return estiloTeoria;
@@ -216,8 +213,8 @@ public enum ModeloIA {
 
     /**
      * Tier-specific cognitive style for exam generation (Tutor: rápido y esencial;
-     * Maestro: razonado y con contexto; Catedrático: el examen más riguroso posible,
-     * con distractores sutiles y justificación formal).
+     * Catedrático: el examen más riguroso posible, con distractores sutiles y
+     * justificación formal).
      */
     public String getEstiloEvaluacion() {
         return estiloEvaluacion;
