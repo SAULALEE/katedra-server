@@ -88,10 +88,19 @@ public class TemarioController {
      * @return a list of active syllabi for the user
      */
     @GetMapping
-    public ResponseEntity<List<TemarioResponseDTO>> getMyTemarios(Authentication authentication) {
+    public ResponseEntity<List<TemarioResponseDTO>> getMyTemarios(
+            @RequestParam(required = false) String asignatura,
+            Authentication authentication) {
         String userEmail = authentication.getName();
-        List<TemarioResponseDTO> list = temarioService.getTemariosByUser(userEmail);
+        List<TemarioResponseDTO> list = asignatura == null
+                ? temarioService.getTemariosByUser(userEmail)
+                : temarioService.getTemariosByAsignatura(userEmail, asignatura);
         return ResponseEntity.ok(list);
+    }
+
+    @GetMapping("/asignaturas")
+    public ResponseEntity<List<String>> getMyAsignaturas(Authentication authentication) {
+        return ResponseEntity.ok(temarioService.getAsignaturasByUser(authentication.getName()));
     }
 
     @GetMapping("/estadisticas")

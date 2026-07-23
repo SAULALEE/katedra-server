@@ -177,8 +177,26 @@ public class TemarioService {
     public List<TemarioResponseDTO> getTemariosByUser(String userEmail) {
         Usuario usuario = usuarioRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-
         return temarioRepository.findByUsuarioIdOrderByCreatedAtAsc(usuario.getId())
+                .stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<String> getAsignaturasByUser(String userEmail) {
+        Usuario usuario = usuarioRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        return temarioRepository.findDistinctAsignaturasByUsuarioId(usuario.getId());
+    }
+
+    public List<TemarioResponseDTO> getTemariosByAsignatura(String userEmail, String asignatura) {
+        if (asignatura == null || asignatura.isBlank()) {
+            return java.util.Collections.emptyList();
+        }
+        Usuario usuario = usuarioRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        return temarioRepository
+                .findByUsuarioIdAndAsignaturaOrderByCreatedAtAsc(usuario.getId(), asignatura)
                 .stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
@@ -187,11 +205,9 @@ public class TemarioService {
     public TemarioResponseDTO getTemarioById(String id, String userEmail) {
         Temario temario = temarioRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Temario no encontrado"));
-
         if (!temario.getUsuario().getEmail().equals(userEmail)) {
             throw new RuntimeException("Acceso denegado a este temario");
         }
-
         return mapToDTO(temario);
     }
 
