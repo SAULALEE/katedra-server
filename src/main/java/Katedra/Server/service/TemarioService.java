@@ -3,18 +3,21 @@ package Katedra.Server.service;
 import Katedra.Server.dto.TemarioRequestDTO;
 import Katedra.Server.dto.TemarioResponseDTO;
 import Katedra.Server.dto.TemarioUploadResponseDTO;
-import Katedra.Server.dto.TemarioDriveRequestDTO;
 import Katedra.Server.dto.TemarioUrlRequestDTO;
 import Katedra.Server.dto.TemarioStatsResponseDTO;
+import Katedra.Server.model.Asignatura;
 import Katedra.Server.model.ContenidoTemario;
 import Katedra.Server.model.Temario;
 import Katedra.Server.model.Usuario;
+import Katedra.Server.repository.AsignaturaRepository;
 import Katedra.Server.repository.ContenidoTemarioRepository;
 import Katedra.Server.repository.TemarioRepository;
 import Katedra.Server.repository.UsuarioRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -23,29 +26,30 @@ import java.util.stream.Collectors;
 public class TemarioService {
 
     private final TemarioRepository temarioRepository;
+    private final AsignaturaRepository asignaturaRepository;
     private final UsuarioRepository usuarioRepository;
     private final ContenidoTemarioRepository contenidoTemarioRepository;
     private final TemarioFileExtractionService temarioFileExtractionService;
     private final TemarioUrlExtractionService temarioUrlExtractionService;
-    private final TemarioGoogleDriveDownloadService temarioGoogleDriveDownloadService;
 
     public TemarioService(
             TemarioRepository temarioRepository,
+            AsignaturaRepository asignaturaRepository,
             UsuarioRepository usuarioRepository,
             ContenidoTemarioRepository contenidoTemarioRepository,
             TemarioFileExtractionService temarioFileExtractionService,
-            TemarioUrlExtractionService temarioUrlExtractionService,
-            TemarioGoogleDriveDownloadService temarioGoogleDriveDownloadService) {
+            TemarioUrlExtractionService temarioUrlExtractionService) {
         this.temarioRepository = temarioRepository;
+        this.asignaturaRepository = asignaturaRepository;
         this.usuarioRepository = usuarioRepository;
         this.contenidoTemarioRepository = contenidoTemarioRepository;
         this.temarioFileExtractionService = temarioFileExtractionService;
         this.temarioUrlExtractionService = temarioUrlExtractionService;
-        this.temarioGoogleDriveDownloadService = temarioGoogleDriveDownloadService;
     }
 
     @Transactional
     public TemarioResponseDTO createTemario(String userEmail, TemarioRequestDTO request) {
+        validateSingleGradoAcademico(request.gradoAcademico());
         Usuario usuario = usuarioRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
@@ -54,7 +58,7 @@ public class TemarioService {
                 request.titulo(),
                 request.descripcion(),
                 request.gradoAcademico(),
-                request.asignatura()
+                findOwnedAsignatura(request.asignaturaId(), userEmail)
         );
 
         Temario saved = temarioRepository.save(temario);
@@ -64,6 +68,7 @@ public class TemarioService {
 
     @Transactional
     public TemarioResponseDTO updateTemario(String id, String userEmail, TemarioRequestDTO request) {
+        validateSingleGradoAcademico(request.gradoAcademico());
         Temario temario = temarioRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Temario no encontrado"));
         if (!temario.getUsuario().getEmail().equals(userEmail)) {
@@ -73,7 +78,7 @@ public class TemarioService {
         temario.setTitulo(request.titulo());
         temario.setDescripcion(request.descripcion());
         temario.setGradoAcademico(request.gradoAcademico());
-        temario.setAsignatura(request.asignatura());
+        temario.setAsignatura(findOwnedAsignatura(request.asignaturaId(), userEmail));
         temario.setUpdatedAt(java.time.LocalDateTime.now());
         return mapToDTO(temarioRepository.save(temario));
     }
@@ -83,10 +88,12 @@ public class TemarioService {
             String userEmail,
             MultipartFile file,
             String titulo,
-            String asignatura,
+            String asignaturaId,
             String gradoAcademico) {
+        validateSingleGradoAcademico(gradoAcademico);
         Usuario usuario = usuarioRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        Asignatura asignatura = findOwnedAsignatura(asignaturaId, userEmail);
         var extracted = temarioFileExtractionService.extract(file);
         String resolvedTitulo = resolveTitulo(titulo, extracted.filename());
 
@@ -101,6 +108,7 @@ public class TemarioService {
 
         ContenidoTemario contenido = new ContenidoTemario(savedTemario);
         contenido.setTeoria(extracted.text());
+        contenido.setContenidoFuente(extracted.text());
         ContenidoTemario savedContenido = contenidoTemarioRepository.save(contenido);
 
         return new TemarioUploadResponseDTO(
@@ -115,8 +123,10 @@ public class TemarioService {
 
     @Transactional
     public TemarioUploadResponseDTO cargarTemarioUrl(String userEmail, TemarioUrlRequestDTO request) {
+        validateSingleGradoAcademico(request.gradoAcademico());
         Usuario usuario = usuarioRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        Asignatura asignatura = findOwnedAsignatura(request.asignaturaId(), userEmail);
         var extracted = temarioUrlExtractionService.extract(request.url());
         String resolvedTitulo = resolveTitulo(request.titulo(), extracted.title());
 
@@ -125,12 +135,13 @@ public class TemarioService {
                 resolvedTitulo,
                 "Contenido cargado desde URL: " + extracted.url(),
                 request.gradoAcademico(),
-                request.asignatura()
+                asignatura
         );
         Temario savedTemario = temarioRepository.save(temario);
 
         ContenidoTemario contenido = new ContenidoTemario(savedTemario);
         contenido.setTeoria(extracted.text());
+        contenido.setContenidoFuente(extracted.text());
         ContenidoTemario savedContenido = contenidoTemarioRepository.save(contenido);
 
         return new TemarioUploadResponseDTO(
@@ -139,37 +150,6 @@ public class TemarioService {
                 null,
                 "text/html",
                 extracted.url(),
-                extracted.text().length()
-        );
-    }
-
-    @Transactional
-    public TemarioUploadResponseDTO cargarTemarioDrive(String userEmail, TemarioDriveRequestDTO request) {
-        Usuario usuario = usuarioRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        var downloaded = temarioGoogleDriveDownloadService.download(request.url());
-        var extracted = temarioFileExtractionService.extract(downloaded.file());
-        String resolvedTitulo = resolveTitulo(request.titulo(), extracted.filename());
-
-        Temario temario = new Temario(
-                usuario,
-                resolvedTitulo,
-                "Contenido cargado desde Google Drive: " + downloaded.fileId(),
-                request.gradoAcademico(),
-                request.asignatura()
-        );
-        Temario savedTemario = temarioRepository.save(temario);
-
-        ContenidoTemario contenido = new ContenidoTemario(savedTemario);
-        contenido.setTeoria(extracted.text());
-        ContenidoTemario savedContenido = contenidoTemarioRepository.save(contenido);
-
-        return new TemarioUploadResponseDTO(
-                mapToDTO(savedTemario),
-                savedContenido.getId(),
-                extracted.filename(),
-                extracted.contentType(),
-                request.url(),
                 extracted.text().length()
         );
     }
@@ -183,20 +163,24 @@ public class TemarioService {
                 .collect(Collectors.toList());
     }
 
-    public List<String> getAsignaturasByUser(String userEmail) {
-        Usuario usuario = usuarioRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        return temarioRepository.findDistinctAsignaturasByUsuarioId(usuario.getId());
-    }
-
-    public List<TemarioResponseDTO> getTemariosByAsignatura(String userEmail, String asignatura) {
-        if (asignatura == null || asignatura.isBlank()) {
+    public List<TemarioResponseDTO> getTemariosByAsignatura(String userEmail, String asignaturaId) {
+        if (asignaturaId == null || asignaturaId.isBlank()) {
             return java.util.Collections.emptyList();
         }
         Usuario usuario = usuarioRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        findOwnedAsignatura(asignaturaId, userEmail);
         return temarioRepository
-                .findByUsuarioIdAndAsignaturaOrderByCreatedAtAsc(usuario.getId(), asignatura)
+                .findByUsuarioIdAndAsignaturaIdOrderByCreatedAtAsc(usuario.getId(), asignaturaId)
+                .stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<TemarioResponseDTO> getFavoritosByUser(String userEmail) {
+        Usuario usuario = usuarioRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        return temarioRepository.findByUsuarioIdAndFavoritoTrueOrderByCreatedAtAsc(usuario.getId())
                 .stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
@@ -209,6 +193,20 @@ public class TemarioService {
             throw new RuntimeException("Acceso denegado a este temario");
         }
         return mapToDTO(temario);
+    }
+
+    @Transactional
+    public TemarioResponseDTO updateFavorito(String id, String userEmail, boolean favorito) {
+        Temario temario = temarioRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Temario no encontrado"));
+        if (!temario.getUsuario().getEmail().equals(userEmail)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "Acceso denegado a este temario");
+        }
+        temario.setFavorito(favorito);
+        temario.setUpdatedAt(java.time.LocalDateTime.now());
+        return mapToDTO(temarioRepository.save(temario));
     }
 
     @Transactional
@@ -237,7 +235,9 @@ public class TemarioService {
                 temario.getTitulo(),
                 temario.getDescripcion(),
                 temario.getGradoAcademico(),
-                temario.getAsignatura(),
+                temario.getAsignatura().getId(),
+                temario.getAsignatura().getNombre(),
+                temario.isFavorito(),
                 temario.getCreatedAt(),
                 temario.getUpdatedAt()
         );
@@ -252,5 +252,20 @@ public class TemarioService {
             return filename.substring(0, extensionStart);
         }
         return filename;
+    }
+
+    private void validateSingleGradoAcademico(String gradoAcademico) {
+        if (gradoAcademico == null || gradoAcademico.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El grado académico es obligatorio");
+        }
+        if (gradoAcademico.contains(",") || gradoAcademico.contains(";")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Solo se permite un grado académico");
+        }
+    }
+
+    private Asignatura findOwnedAsignatura(String asignaturaId, String userEmail) {
+        return asignaturaRepository.findByIdAndUsuarioEmail(asignaturaId, userEmail)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Asignatura no encontrada"));
     }
 }

@@ -3,10 +3,12 @@ package Katedra.Server.controller;
 import Katedra.Server.dto.TemarioRequestDTO;
 import Katedra.Server.dto.TemarioResponseDTO;
 import Katedra.Server.dto.TemarioUploadResponseDTO;
-import Katedra.Server.dto.TemarioDriveRequestDTO;
 import Katedra.Server.dto.TemarioUrlRequestDTO;
+import Katedra.Server.model.ModeloGeneracion;
 import Katedra.Server.service.TemarioService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -42,43 +45,50 @@ public class TemarioController {
      * @return the created syllabus details with HTTP 201 Created
      */
     @PostMapping
-    public ResponseEntity<TemarioResponseDTO> createTemario(
+    public CompletableFuture<ResponseEntity<TemarioResponseDTO>> createTemario(
             @Valid @RequestBody TemarioRequestDTO request,
             Authentication authentication) {
         String userEmail = authentication.getName();
         TemarioResponseDTO created = temarioService.createTemario(userEmail, request);
-        return new ResponseEntity<>(created, HttpStatus.CREATED);
+        var generationRequest = new Katedra.Server.dto.GenerarMaterialRequestDTO(
+                Set.of(Katedra.Server.model.PiezaMaterial.TEORIA),
+                resolveModeloGeneracion(request.modeloGeneracion()), null, null);
+        return contenidoTemarioService.generarMaterial(created.id(), userEmail, generationRequest)
+                .thenApply(content -> new ResponseEntity<>(created, HttpStatus.CREATED));
     }
 
     @PostMapping(value = "/cargar/archivo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<TemarioUploadResponseDTO> cargarTemarioArchivo(
+    public CompletableFuture<ResponseEntity<TemarioUploadResponseDTO>> cargarTemarioArchivo(
             @RequestPart("file") MultipartFile file,
             @RequestParam String titulo,
-            @RequestParam String asignatura,
-            @RequestParam String gradoAcademico,
+            @RequestParam @NotBlank(message = "La asignatura es obligatoria") String asignaturaId,
+            @RequestParam
+            @NotBlank(message = "El grado académico es obligatorio")
+            @Pattern(regexp = "^[^,;]+$", message = "Solo se permite un grado académico")
+            String gradoAcademico,
+            @RequestParam(defaultValue = "BASICO") ModeloGeneracion modeloGeneracion,
             Authentication authentication) {
         String userEmail = authentication.getName();
         TemarioUploadResponseDTO created = temarioService.cargarTemarioArchivo(
-                userEmail, file, titulo, asignatura, gradoAcademico);
-        return new ResponseEntity<>(created, HttpStatus.CREATED);
+                userEmail, file, titulo, asignaturaId, gradoAcademico);
+        var generationRequest = new Katedra.Server.dto.GenerarMaterialRequestDTO(
+                Set.of(Katedra.Server.model.PiezaMaterial.TEORIA),
+                modeloGeneracion.toModeloIA(), null, null);
+        return contenidoTemarioService.generarMaterial(created.temario().id(), userEmail, generationRequest)
+                .thenApply(content -> new ResponseEntity<>(created, HttpStatus.CREATED));
     }
 
     @PostMapping("/cargar/url")
-    public ResponseEntity<TemarioUploadResponseDTO> cargarTemarioUrl(
-            @RequestBody TemarioUrlRequestDTO request,
+    public CompletableFuture<ResponseEntity<TemarioUploadResponseDTO>> cargarTemarioUrl(
+            @Valid @RequestBody TemarioUrlRequestDTO request,
             Authentication authentication) {
         String userEmail = authentication.getName();
         TemarioUploadResponseDTO created = temarioService.cargarTemarioUrl(userEmail, request);
-        return new ResponseEntity<>(created, HttpStatus.CREATED);
-    }
-
-    @PostMapping("/cargar/drive")
-    public ResponseEntity<TemarioUploadResponseDTO> cargarTemarioDrive(
-            @RequestBody TemarioDriveRequestDTO request,
-            Authentication authentication) {
-        String userEmail = authentication.getName();
-        TemarioUploadResponseDTO created = temarioService.cargarTemarioDrive(userEmail, request);
-        return new ResponseEntity<>(created, HttpStatus.CREATED);
+        var generationRequest = new Katedra.Server.dto.GenerarMaterialRequestDTO(
+                Set.of(Katedra.Server.model.PiezaMaterial.TEORIA),
+                resolveModeloGeneracion(request.modeloGeneracion()), null, null);
+        return contenidoTemarioService.generarMaterial(created.temario().id(), userEmail, generationRequest)
+                .thenApply(content -> new ResponseEntity<>(created, HttpStatus.CREATED));
     }
 
     /**
@@ -89,18 +99,19 @@ public class TemarioController {
      */
     @GetMapping
     public ResponseEntity<List<TemarioResponseDTO>> getMyTemarios(
-            @RequestParam(required = false) String asignatura,
+            @RequestParam(required = false) String asignaturaId,
             Authentication authentication) {
         String userEmail = authentication.getName();
-        List<TemarioResponseDTO> list = asignatura == null
+        List<TemarioResponseDTO> list = asignaturaId == null
                 ? temarioService.getTemariosByUser(userEmail)
-                : temarioService.getTemariosByAsignatura(userEmail, asignatura);
+                : temarioService.getTemariosByAsignatura(userEmail, asignaturaId);
         return ResponseEntity.ok(list);
     }
 
-    @GetMapping("/asignaturas")
-    public ResponseEntity<List<String>> getMyAsignaturas(Authentication authentication) {
-        return ResponseEntity.ok(temarioService.getAsignaturasByUser(authentication.getName()));
+    @GetMapping("/favoritos")
+    public ResponseEntity<List<TemarioResponseDTO>> getFavoritos(Authentication authentication) {
+        return ResponseEntity.ok(
+                temarioService.getFavoritosByUser(authentication.getName()));
     }
 
     @GetMapping("/estadisticas")
@@ -131,6 +142,15 @@ public class TemarioController {
             @Valid @RequestBody TemarioRequestDTO request,
             Authentication authentication) {
         return ResponseEntity.ok(temarioService.updateTemario(id, authentication.getName(), request));
+    }
+
+    @PatchMapping("/{id}/favorito")
+    public ResponseEntity<TemarioResponseDTO> updateFavorito(
+            @PathVariable String id,
+            @Valid @RequestBody Katedra.Server.dto.TemarioFavoritoRequestDTO request,
+            Authentication authentication) {
+        return ResponseEntity.ok(temarioService.updateFavorito(
+                id, authentication.getName(), request.favorito()));
     }
 
     /**
@@ -166,6 +186,14 @@ public class TemarioController {
         return ResponseEntity.ok(contenido);
     }
 
+    @GetMapping("/{id}/fuente")
+    public ResponseEntity<Katedra.Server.dto.ContenidoFuenteResponseDTO> getFuenteByTemarioId(
+            @PathVariable String id,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                contenidoTemarioService.getFuenteByTemarioId(id, authentication.getName()));
+    }
+
     /**
      * Selectively generates educational material pieces for an existing syllabus.
      * Pieces that already exist are skipped unless explicitly listed for regeneration,
@@ -184,5 +212,11 @@ public class TemarioController {
         String userEmail = authentication.getName();
         return contenidoTemarioService.generarMaterial(id, userEmail, request)
                 .thenApply(ResponseEntity::ok);
+    }
+
+    private Katedra.Server.model.ModeloIA resolveModeloGeneracion(ModeloGeneracion modeloGeneracion) {
+        return modeloGeneracion == null
+                ? Katedra.Server.model.ModeloIA.BASICO
+                : modeloGeneracion.toModeloIA();
     }
 }

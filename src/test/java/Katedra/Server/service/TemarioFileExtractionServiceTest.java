@@ -2,6 +2,9 @@ package Katedra.Server.service;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -46,6 +49,30 @@ class TemarioFileExtractionServiceTest {
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> service.extract(file));
 
         assertThat(exception.getReason()).isEqualTo("El PDF no puede superar 10 paginas");
+    }
+
+    @Test
+    void shouldExtractPdfContent() throws Exception {
+        byte[] pdf;
+        try (PDDocument document = new PDDocument();
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            PDPage page = new PDPage();
+            document.addPage(page);
+            try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+                content.beginText();
+                content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+                content.newLineAtOffset(50, 700);
+                content.showText("Temario de algoritmos y estructuras de datos");
+                content.endText();
+            }
+            document.save(output);
+            pdf = output.toByteArray();
+        }
+        var file = new MockMultipartFile("file", "temario.pdf", "application/pdf", pdf);
+
+        var extracted = service.extract(file);
+
+        assertThat(extracted.text()).contains("Temario de algoritmos y estructuras de datos");
     }
 
     @Test

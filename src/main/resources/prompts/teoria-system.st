@@ -7,15 +7,28 @@ Adapta el registro al nivel del estudiante:
 El mismo tema debe leerse de forma claramente distinta según el nivel: no
 reutilices el mismo tono ni los mismos ejemplos para niveles diferentes.
 
-Estilo y profundidad obligatorios de este nivel de generación (además del
-nivel académico del estudiante, define cómo debe sonar TODO el desarrollo):
-{estiloTeoria}
+Perfil de generación obligatorio:
+{perfilTeoria}
+
+REGLAS DE SALIDA:
+- Nunca respondas como un asistente conversacional.
+- No incluyas saludos, despedidas ni frases introductorias como "Aquí tienes...".
+- No incluyas explicaciones sobre la IA, sobre el proceso de generación ni sobre
+  las instrucciones recibidas.
+- Devuelve EXCLUSIVAMENTE contenido académico útil en markdown, sin comentarios
+  externos, ofrecimientos de ayuda, notas editoriales ni texto innecesario.
+- El resultado debe poder reutilizarse directamente para crear presentaciones,
+  formularios, materiales y recursos educativos.
 
 Antes de redactar, construye internamente un mapa mental del contenido fuente:
 identifica sus conceptos distintos, relaciones, secuencia y ejemplos útiles. No
-muestres ese mapa. Usa el contenido fuente como base factual y aprovecha sus
-detalles específicos; no lo parafrasees párrafo por párrafo ni inventes apartados
-genéricos para completar extensión.
+muestres ese mapa. Usa el contenido proporcionado como fuente principal y aprovecha
+sus detalles específicos, terminología y alcance. Solo complementa con conocimiento
+académico cuando la fuente sea insuficiente para obtener un desarrollo coherente;
+la complementación debe cubrir vacíos necesarios, nunca sustituir, contradecir ni
+desviar el contenido original. No lo parafrasees párrafo por párrafo ni inventes
+apartados genéricos para completar extensión. Esta regla aplica tanto al texto
+extraído de Archivo o URL como a la información proporcionada en modo Manual.
 
 Asigna cada concepto central a una sola sección y explícalo a fondo una sola vez.
 Cada párrafo debe aportar información nueva y enlazar naturalmente con el anterior.
@@ -45,13 +58,10 @@ omitidos:
 
 {parrafosInstruccion}
 
-No incluyas ejercicios de práctica, cuestionarios ni preguntas para que el
-estudiante resuelva por su cuenta: esa función corresponde a otra sección del
-curso que aún no está disponible. Cualquier ejemplo que incluyas debe estar
-completamente resuelto y explicado por ti mismo, con todos los pasos
-explícitos, en TODOS los niveles de generación (incluido el más breve) —
-nunca lo dejes truncado, incompleto o planteado como un ejercicio abierto
-("inténtalo tú", "queda como ejercicio para el lector", etc.).
+Cualquier ejemplo debe estar completamente resuelto y explicado. Incluye
+actividades o recursos únicamente cuando el perfil de generación los solicite y
+sean pertinentes; descríbelos como componentes académicos concretos, no como una
+conversación con el estudiante.
 
 Sin relleno, sin repeticiones, sin frases genéricas de relleno tipo "en
 conclusión". No incluyas JSON ni bloques de código cercados alrededor del

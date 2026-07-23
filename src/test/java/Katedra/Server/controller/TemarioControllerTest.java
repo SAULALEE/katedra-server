@@ -3,9 +3,9 @@ package Katedra.Server.controller;
 import Katedra.Server.dto.TemarioRequestDTO;
 import Katedra.Server.dto.TemarioResponseDTO;
 import Katedra.Server.dto.TemarioUploadResponseDTO;
-import Katedra.Server.dto.TemarioDriveRequestDTO;
 import Katedra.Server.dto.TemarioUrlRequestDTO;
 import Katedra.Server.model.NivelAcademico;
+import Katedra.Server.model.PiezaMaterial;
 import Katedra.Server.service.ContenidoTemarioService;
 import Katedra.Server.service.TemarioService;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +26,7 @@ import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -69,7 +70,9 @@ class TemarioControllerTest {
                 "Curso de Java",
                 "Aprende Java 21",
                 "universitario",
+                "asignatura-1",
                 "Programacion",
+                false,
                 LocalDateTime.now(),
                 LocalDateTime.now()
         );
@@ -82,44 +85,73 @@ class TemarioControllerTest {
                     "titulo": "Curso de Java",
                     "descripcion": "Aprende Java 21",
                     "gradoAcademico": "universitario",
-                    "asignatura": "Programacion"
+                    "asignaturaId": "asignatura-1"
                 }
                 """;
         given(temarioService.createTemario(eq("profesor@katedra.com"), any(TemarioRequestDTO.class)))
                 .willReturn(mockResponse);
+        var generatedContent = new Katedra.Server.dto.ContenidoTemarioResponseDTO(
+                "contenido-uuid-789", "temario-uuid-123", "## Teoria generada",
+                null, null, "basico", Map.of());
+        given(contenidoTemarioService.generarMaterial(
+                eq("temario-uuid-123"), eq("profesor@katedra.com"),
+                any(Katedra.Server.dto.GenerarMaterialRequestDTO.class)))
+                .willReturn(CompletableFuture.completedFuture(generatedContent));
 
-        mockMvc.perform(post("/temarios")
+        var mvcResult = mockMvc.perform(post("/temarios")
                         .principal(mockPrincipal)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequest))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value("temario-uuid-123"))
                 .andExpect(jsonPath("$.titulo").value("Curso de Java"))
                 .andExpect(jsonPath("$.descripcion").value("Aprende Java 21"));
 
         verify(temarioService).createTemario(eq("profesor@katedra.com"), any(TemarioRequestDTO.class));
+        verify(contenidoTemarioService).generarMaterial(
+                eq("temario-uuid-123"), eq("profesor@katedra.com"),
+                org.mockito.ArgumentMatchers.argThat(request ->
+                        request.piezas().equals(Set.of(PiezaMaterial.TEORIA))
+                                && request.modelo() == Katedra.Server.model.ModeloIA.BASICO));
     }
 
     @Test
-    void shouldAcceptCommaSeparatedAcademicGradesForManualTemario() throws Exception {
+    void shouldRejectMultipleAcademicGradesForManualTemario() throws Exception {
         String jsonRequest = """
                 {
                     "titulo": "Curso multidisciplinario",
                     "descripcion": "Contenido manual",
                     "gradoAcademico": "Primaria, Universidad, Diplomado de programacion",
-                    "asignatura": "Programacion"
+                    "asignaturaId": "asignatura-1"
                 }
                 """;
-        given(temarioService.createTemario(eq("profesor@katedra.com"), any(TemarioRequestDTO.class)))
-                .willReturn(mockResponse);
-
         mockMvc.perform(post("/temarios")
                         .principal(mockPrincipal)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequest))
-                .andExpect(status().isCreated());
+                .andExpect(status().isBadRequest());
 
-        verify(temarioService).createTemario(eq("profesor@katedra.com"), any(TemarioRequestDTO.class));
+        org.mockito.Mockito.verifyNoInteractions(temarioService);
+    }
+
+    @Test
+    void shouldRejectMultipleAcademicGradesForFileUpload() throws Exception {
+        var file = new org.springframework.mock.web.MockMultipartFile(
+                "file", "temario.md", "text/markdown", "# Temario".getBytes());
+
+        mockMvc.perform(multipart("/temarios/cargar/archivo")
+                        .file(file)
+                        .param("titulo", "Curso")
+                        .param("asignaturaId", "asignatura-1")
+                        .param("gradoAcademico", "Primaria, Universidad")
+                        .principal(mockPrincipal))
+                .andExpect(status().isBadRequest());
+
+        org.mockito.Mockito.verifyNoInteractions(temarioService);
     }
 
     @Test
@@ -132,16 +164,28 @@ class TemarioControllerTest {
                 eq("profesor@katedra.com"),
                 any(org.springframework.web.multipart.MultipartFile.class),
                 eq("Curso de Java"),
-                eq("Programacion"),
+                eq("asignatura-1"),
                 eq("Universidad")))
                 .willReturn(uploadResponse);
+        given(contenidoTemarioService.generarMaterial(
+                eq("temario-uuid-123"), eq("profesor@katedra.com"),
+                any(Katedra.Server.dto.GenerarMaterialRequestDTO.class)))
+                .willReturn(CompletableFuture.completedFuture(
+                        new Katedra.Server.dto.ContenidoTemarioResponseDTO(
+                                "contenido-uuid-789", "temario-uuid-123", "## Teoria generada",
+                                null, null, "basico", Map.of())));
 
-        mockMvc.perform(multipart("/temarios/cargar/archivo")
+        var mvcResult = mockMvc.perform(multipart("/temarios/cargar/archivo")
                         .file(file)
                         .param("titulo", "Curso de Java")
-                        .param("asignatura", "Programacion")
+                        .param("asignaturaId", "asignatura-1")
                         .param("gradoAcademico", "Universidad")
+                        .param("modeloGeneracion", "AVANZADO")
                         .principal(mockPrincipal))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.temario.id").value("temario-uuid-123"))
                 .andExpect(jsonPath("$.contenidoId").value("contenido-uuid-789"))
@@ -151,8 +195,13 @@ class TemarioControllerTest {
                 eq("profesor@katedra.com"),
                 any(org.springframework.web.multipart.MultipartFile.class),
                 eq("Curso de Java"),
-                eq("Programacion"),
+                eq("asignatura-1"),
                 eq("Universidad"));
+        verify(contenidoTemarioService).generarMaterial(
+                eq("temario-uuid-123"), eq("profesor@katedra.com"),
+                org.mockito.ArgumentMatchers.argThat(request ->
+                        request.piezas().equals(Set.of(PiezaMaterial.TEORIA))
+                                && request.modelo() == Katedra.Server.model.ModeloIA.AVANZADO));
     }
 
     @Test
@@ -161,8 +210,9 @@ class TemarioControllerTest {
                 {
                     "url": "https://example.com/temario",
                     "titulo": "Curso Web",
-                    "asignatura": "Programacion",
-                    "gradoAcademico": "Universidad"
+                    "asignaturaId": "asignatura-1",
+                    "gradoAcademico": "Universidad",
+                    "modeloGeneracion": "AVANZADO"
                 }
                 """;
         var uploadResponse = new TemarioUploadResponseDTO(
@@ -171,11 +221,22 @@ class TemarioControllerTest {
                 eq("profesor@katedra.com"),
                 any(TemarioUrlRequestDTO.class)))
                 .willReturn(uploadResponse);
+        given(contenidoTemarioService.generarMaterial(
+                eq("temario-uuid-123"), eq("profesor@katedra.com"),
+                any(Katedra.Server.dto.GenerarMaterialRequestDTO.class)))
+                .willReturn(CompletableFuture.completedFuture(
+                        new Katedra.Server.dto.ContenidoTemarioResponseDTO(
+                                "contenido-uuid-790", "temario-uuid-123", "## Teoria generada",
+                                null, null, "basico", Map.of())));
 
-        mockMvc.perform(post("/temarios/cargar/url")
+        var mvcResult = mockMvc.perform(post("/temarios/cargar/url")
                         .principal(mockPrincipal)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequest))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.temario.id").value("temario-uuid-123"))
                 .andExpect(jsonPath("$.contenidoId").value("contenido-uuid-790"))
@@ -184,38 +245,61 @@ class TemarioControllerTest {
         verify(temarioService).cargarTemarioUrl(
                 eq("profesor@katedra.com"),
                 any(TemarioUrlRequestDTO.class));
+        verify(contenidoTemarioService).generarMaterial(
+                eq("temario-uuid-123"), eq("profesor@katedra.com"),
+                org.mockito.ArgumentMatchers.argThat(request ->
+                        request.piezas().equals(Set.of(PiezaMaterial.TEORIA))
+                                && request.modelo() == Katedra.Server.model.ModeloIA.AVANZADO));
     }
 
     @Test
-    void shouldUploadTemarioDrive() throws Exception {
+    void shouldRejectUnsupportedGenerationModel() throws Exception {
         String jsonRequest = """
                 {
-                    "url": "https://drive.google.com/file/d/file-123/view",
-                    "titulo": "Curso Drive",
-                    "asignatura": "Programacion",
-                    "gradoAcademico": "Universidad"
+                    "titulo": "Curso",
+                    "descripcion": "Contenido",
+                    "gradoAcademico": "Universidad",
+                    "asignaturaId": "asignatura-1",
+                    "modeloGeneracion": "FLASH"
                 }
                 """;
-        var uploadResponse = new TemarioUploadResponseDTO(
-                mockResponse, "contenido-uuid-791", "drive-temario.md", "text/markdown",
-                "https://drive.google.com/file/d/file-123/view", 120);
-        given(temarioService.cargarTemarioDrive(
-                eq("profesor@katedra.com"),
-                any(TemarioDriveRequestDTO.class)))
-                .willReturn(uploadResponse);
 
-        mockMvc.perform(post("/temarios/cargar/drive")
+        mockMvc.perform(post("/temarios")
                         .principal(mockPrincipal)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonRequest))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.temario.id").value("temario-uuid-123"))
-                .andExpect(jsonPath("$.contenidoId").value("contenido-uuid-791"))
-                .andExpect(jsonPath("$.archivoNombre").value("drive-temario.md"));
+                .andExpect(status().isBadRequest());
 
-        verify(temarioService).cargarTemarioDrive(
-                eq("profesor@katedra.com"),
-                any(TemarioDriveRequestDTO.class));
+        org.mockito.Mockito.verifyNoInteractions(temarioService);
+    }
+
+    @Test
+    void shouldNotExposeGoogleDriveUploadEndpoint() throws Exception {
+        mockMvc.perform(post("/temarios/cargar/drive")
+                        .principal(mockPrincipal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldRejectMultipleAcademicGradesForUrlUpload() throws Exception {
+        String jsonRequest = """
+                {
+                    "url": "https://example.com/temario",
+                    "titulo": "Curso Web",
+                    "asignaturaId": "asignatura-1",
+                    "gradoAcademico": "Primaria, Universidad"
+                }
+                """;
+
+        mockMvc.perform(post("/temarios/cargar/url")
+                        .principal(mockPrincipal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonRequest))
+                .andExpect(status().isBadRequest());
+
+        org.mockito.Mockito.verifyNoInteractions(temarioService);
     }
 
     @Test
@@ -227,38 +311,73 @@ class TemarioControllerTest {
                         .principal(mockPrincipal))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value("temario-uuid-123"))
-                .andExpect(jsonPath("$[0].titulo").value("Curso de Java"));
+                .andExpect(jsonPath("$[0].titulo").value("Curso de Java"))
+                .andExpect(jsonPath("$[0].favorito").value(false));
 
         verify(temarioService).getTemariosByUser("profesor@katedra.com");
     }
 
     @Test
-    void shouldGetAuthenticatedProfessorAsignaturas() throws Exception {
-        given(temarioService.getAsignaturasByUser("profesor@katedra.com"))
-                .willReturn(List.of("Arquitectura", "Programacion"));
+    void shouldListAuthenticatedUserFavorites() throws Exception {
+        given(temarioService.getFavoritosByUser("profesor@katedra.com"))
+                .willReturn(List.of(mockResponse));
 
-        mockMvc.perform(get("/temarios/asignaturas")
-                        .principal(mockPrincipal))
+        mockMvc.perform(get("/temarios/favoritos").principal(mockPrincipal))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0]").value("Arquitectura"))
-                .andExpect(jsonPath("$[1]").value("Programacion"));
+                .andExpect(jsonPath("$[0].id").value("temario-uuid-123"))
+                .andExpect(jsonPath("$[0].favorito").value(false));
 
-        verify(temarioService).getAsignaturasByUser("profesor@katedra.com");
+        verify(temarioService).getFavoritosByUser("profesor@katedra.com");
+    }
+
+    @Test
+    void shouldMarkTemarioAsFavorite() throws Exception {
+        var favoriteResponse = new TemarioResponseDTO(
+                mockResponse.id(), mockResponse.titulo(), mockResponse.descripcion(),
+                mockResponse.gradoAcademico(), mockResponse.asignaturaId(),
+                mockResponse.asignatura(), true, mockResponse.createdAt(), mockResponse.updatedAt());
+        given(temarioService.updateFavorito(
+                "temario-uuid-123", "profesor@katedra.com", true))
+                .willReturn(favoriteResponse);
+
+        mockMvc.perform(patch("/temarios/temario-uuid-123/favorito")
+                        .principal(mockPrincipal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"favorito\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.favorito").value(true));
+
+        verify(temarioService).updateFavorito(
+                "temario-uuid-123", "profesor@katedra.com", true);
+    }
+
+    @Test
+    void shouldUnmarkTemarioAsFavorite() throws Exception {
+        given(temarioService.updateFavorito(
+                "temario-uuid-123", "profesor@katedra.com", false))
+                .willReturn(mockResponse);
+
+        mockMvc.perform(patch("/temarios/temario-uuid-123/favorito")
+                        .principal(mockPrincipal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"favorito\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.favorito").value(false));
     }
 
     @Test
     void shouldGetAuthenticatedProfessorTemariosFilteredByAsignatura() throws Exception {
-        given(temarioService.getTemariosByAsignatura("profesor@katedra.com", "Programacion"))
+        given(temarioService.getTemariosByAsignatura("profesor@katedra.com", "asignatura-1"))
                 .willReturn(List.of(mockResponse));
 
         mockMvc.perform(get("/temarios")
-                        .param("asignatura", "Programacion")
+                        .param("asignaturaId", "asignatura-1")
                         .principal(mockPrincipal))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value("temario-uuid-123"))
                 .andExpect(jsonPath("$[0].asignatura").value("Programacion"));
 
-        verify(temarioService).getTemariosByAsignatura("profesor@katedra.com", "Programacion");
+        verify(temarioService).getTemariosByAsignatura("profesor@katedra.com", "asignatura-1");
     }
 
     @Test
@@ -295,7 +414,7 @@ class TemarioControllerTest {
                         .principal(mockPrincipal)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"titulo":"Curso de Java","descripcion":"Actualizado","gradoAcademico":"Universidad","asignatura":"Programación"}
+                                {"titulo":"Curso de Java","descripcion":"Actualizado","gradoAcademico":"Universidad","asignaturaId":"asignatura-1"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("temario-uuid-123"));
@@ -327,6 +446,23 @@ class TemarioControllerTest {
                 .andExpect(jsonPath("$.modelo").value("flash"));
 
         verify(contenidoTemarioService).getContenidoByTemarioId("temario-uuid-123", "profesor@katedra.com");
+    }
+
+    @Test
+    void shouldGetOriginalSourceByTemarioId() throws Exception {
+        var response = new Katedra.Server.dto.ContenidoFuenteResponseDTO(
+                "temario-uuid-123", "Texto original extraído");
+        given(contenidoTemarioService.getFuenteByTemarioId(
+                "temario-uuid-123", "profesor@katedra.com")).willReturn(response);
+
+        mockMvc.perform(get("/temarios/temario-uuid-123/fuente")
+                        .principal(mockPrincipal))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.temarioId").value("temario-uuid-123"))
+                .andExpect(jsonPath("$.contenidoFuente").value("Texto original extraído"));
+
+        verify(contenidoTemarioService).getFuenteByTemarioId(
+                "temario-uuid-123", "profesor@katedra.com");
     }
 
     @Test
