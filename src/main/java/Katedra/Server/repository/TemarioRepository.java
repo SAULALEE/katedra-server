@@ -8,5 +8,12 @@ import java.util.List;
 
 @Repository
 public interface TemarioRepository extends JpaRepository<Temario, String> {
+
     List<Temario> findByUsuarioIdOrderByCreatedAtAsc(String usuarioId);
+
+    List<Temario> findByUsuarioIdAndAsignaturaIdOrderByCreatedAtAsc(String usuarioId, String asignaturaId);
+
+    List<Temario> findByUsuarioIdAndFavoritoTrueOrderByCreatedAtAsc(String usuarioId);
+
+    boolean existsByAsignaturaId(String asignaturaId);
 }

@@ -1,0 +1,2 @@
+ALTER TABLE temario
+    ADD COLUMN favorito BOOLEAN NOT NULL DEFAULT FALSE AFTER asignatura_id;

@@ -1,6 +1,7 @@
 package Katedra.Server.service;
 
 import Katedra.Server.dto.ContenidoTemarioResponseDTO;
+import Katedra.Server.dto.ContenidoFuenteResponseDTO;
 import Katedra.Server.dto.DiapositivaDTO;
 import Katedra.Server.dto.EvaluacionPreguntaDTO;
 import Katedra.Server.dto.GenerarMaterialRequestDTO;
@@ -57,6 +58,22 @@ public class ContenidoTemarioService {
         return mapToDTO(entity, Map.of());
     }
 
+    @Transactional(readOnly = true)
+    public ContenidoFuenteResponseDTO getFuenteByTemarioId(String temarioId, String userEmail) {
+        findOwnedTemario(temarioId, userEmail);
+        ContenidoTemario entity = contenidoTemarioRepository.findByTemarioId(temarioId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Contenido fuente no disponible"));
+        String fuente = entity.getContenidoFuente();
+        if (fuente == null || fuente.isBlank()) {
+            fuente = entity.getTeoria();
+        }
+        if (fuente == null || fuente.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contenido fuente no disponible");
+        }
+        return new ContenidoFuenteResponseDTO(temarioId, fuente);
+    }
+
     /**
      * Generates every requested piece, always overwriting any existing content for it.
      */
@@ -78,9 +95,11 @@ public class ContenidoTemarioService {
         int numeroDiapositivas = resolverNumeroDiapositivas(modeloTier, request);
         int numeroParrafos = resolverNumeroParrafos(modeloTier, request);
         int numeroPreguntas = resolverNumeroPreguntas(modeloTier, request);
-        // Source text for teoría; once PDF/web ingestion lands this prefers temario
-        // source content.
-        String fuente = temario.getDescripcion();
+        // Source text for teoría: prefers the ingested content (file/URL) already stored
+        // as teoría, falling back to the syllabus description for manually created ones.
+        String fuente = contenido.getTeoria() != null && !contenido.getTeoria().isBlank()
+                ? contenido.getTeoria()
+                : temario.getDescripcion();
 
         Set<PiezaMaterial> piezas = request.piezas();
         boolean generaTeoriaAhora = piezas.contains(PiezaMaterial.TEORIA);
@@ -98,7 +117,11 @@ public class ContenidoTemarioService {
         // output can be reused; otherwise the already-persisted theory is reused as-is.
         CompletableFuture<String> teoriaFuture = generaTeoriaAhora
                 ? aiContentGeneratorService.generarTeoria(
-                        temario.getAsignatura(), temario.getTitulo(), nivelGeneracion, fuente, modeloTier,
+                        temario.getAsignatura().getNombre(),
+                        temario.getTitulo(),
+                        nivelGeneracion,
+                        fuente,
+                        modeloTier,
                         numeroParrafos)
                 : CompletableFuture.completedFuture(teoriaGuardada);
 
@@ -221,9 +244,9 @@ public class ContenidoTemarioService {
     private CompletableFuture<?> dispatch(
             PiezaMaterial pieza, Temario temario, NivelAcademico nivel, CompletableFuture<String> teoriaFuture,
             ModeloIA modeloTier, int numeroDiapositivas, int numeroPreguntas) {
-        String asignatura = temario.getAsignatura();
+        String asignatura = temario.getAsignatura().getNombre();
         String titulo = temario.getTitulo();
-        String grado = nivel.getEtiqueta();
+        String grado = temario.getGradoAcademico();
         return switch (pieza) {
             case TEORIA -> teoriaFuture;
             case EVALUACION -> teoriaFuture.thenCompose(teoriaTexto ->

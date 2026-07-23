@@ -31,8 +31,12 @@ public class Temario {
     @Column(name = "grado_academico", length = 255, nullable = false)
     private String gradoAcademico;
 
-    @Column(name = "asignatura", length = 100)
-    private String asignatura;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "asignatura_id", nullable = false)
+    private Asignatura asignatura;
+
+    @Column(name = "favorito", nullable = false)
+    private boolean favorito = false;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -46,12 +50,18 @@ public class Temario {
     // Default constructor
     public Temario() {}
 
-    public Temario(Usuario usuario, String titulo, String descripcion, String gradoAcademico, String asignatura) {
+    public Temario(
+            Usuario usuario,
+            String titulo,
+            String descripcion,
+            String gradoAcademico,
+            Asignatura asignatura) {
         this.usuario = usuario;
         this.titulo = titulo;
         this.descripcion = descripcion;
         this.gradoAcademico = gradoAcademico;
         this.asignatura = asignatura;
+        asignatura.getTemarios().add(this);
     }
 
     public String getId() { return id; }
@@ -69,8 +79,19 @@ public class Temario {
     public String getGradoAcademico() { return gradoAcademico; }
     public void setGradoAcademico(String gradoAcademico) { this.gradoAcademico = gradoAcademico; }
 
-    public String getAsignatura() { return asignatura; }
-    public void setAsignatura(String asignatura) { this.asignatura = asignatura; }
+    public Asignatura getAsignatura() { return asignatura; }
+    public void setAsignatura(Asignatura asignatura) {
+        if (this.asignatura != null) {
+            this.asignatura.getTemarios().remove(this);
+        }
+        this.asignatura = asignatura;
+        if (asignatura != null && !asignatura.getTemarios().contains(this)) {
+            asignatura.getTemarios().add(this);
+        }
+    }
+
+    public boolean isFavorito() { return favorito; }
+    public void setFavorito(boolean favorito) { this.favorito = favorito; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

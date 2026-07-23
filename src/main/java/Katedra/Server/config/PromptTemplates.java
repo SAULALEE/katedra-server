@@ -31,6 +31,10 @@ public final class PromptTemplates {
 
     private static final PromptTemplate TEORIA_SYSTEM_TEMPLATE = loadTemplate("teoria-system.st");
 
+    private static final String TEORIA_BASICO = readResource("teoria-basico.st");
+
+    private static final String TEORIA_AVANZADO = readResource("teoria-avanzado.st");
+
     private static final PromptTemplate DIAPOSITIVAS_SYSTEM_TEMPLATE = loadTemplate("diapositivas-system.st");
 
     private static final PromptTemplate USER_PROMPT_TEMPLATE = loadTemplate("user-prompt.st");
@@ -39,8 +43,20 @@ public final class PromptTemplates {
         return TEORIA_SYSTEM_TEMPLATE.render(Map.of(
                 "katedraContext", KATEDRA_CONTEXT,
                 "nivelRubrica", nivel.getRubrica(),
-                "estiloTeoria", modelo.getEstiloTeoria(),
+                "perfilTeoria", resolvePerfilTeoria(modelo),
                 "parrafosInstruccion", buildParrafosInstruccion(numeroParrafos, modelo.getMaxPalabrasTeoria())));
+    }
+
+    /**
+     * Picks the theory profile for the tier. Both profiles live as .st resources rather
+     * than as {@code ModeloIA.estiloTeoria} literals, so the depth contract of each tier
+     * is reviewable as prompt content.
+     */
+    private static String resolvePerfilTeoria(ModeloIA modelo) {
+        return switch (modelo) {
+            case FLASH -> TEORIA_BASICO;
+            case PRO -> TEORIA_AVANZADO;
+        };
     }
 
     public static String buildEvaluacionSystemPrompt(ModeloIA modelo, NivelAcademico nivel, int numeroPreguntas) {

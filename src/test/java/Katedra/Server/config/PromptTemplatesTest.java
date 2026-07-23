@@ -9,6 +9,64 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PromptTemplatesTest {
 
     @Test
+    void shouldDefineDistinctTutorAndCatedraticoTheoryProfiles() {
+        String flash = PromptTemplates.buildTeoriaSystemPrompt(
+                ModeloIA.FLASH, NivelAcademico.UNIVERSITARIO, ModeloIA.FLASH.getDefaultParrafosTeoria());
+        String pro = PromptTemplates.buildTeoriaSystemPrompt(
+                ModeloIA.PRO, NivelAcademico.UNIVERSITARIO, ModeloIA.PRO.getDefaultParrafosTeoria());
+
+        assertThat(flash)
+                .containsIgnoringCase("breve")
+                .containsIgnoringCase("información académica esencial");
+        assertThat(pro)
+                .containsIgnoringCase("desarrollo completo")
+                .containsIgnoringCase("conceptos")
+                .containsIgnoringCase("ejemplos")
+                .containsIgnoringCase("actividades")
+                .containsIgnoringCase("recursos");
+        assertThat(flash).isNotEqualTo(pro);
+    }
+
+    @Test
+    void shouldForbidConversationalAndMetaAiTextInGeneratedTemario() {
+        String flash = PromptTemplates.buildTeoriaSystemPrompt(
+                ModeloIA.FLASH, NivelAcademico.SECUNDARIA, ModeloIA.FLASH.getDefaultParrafosTeoria());
+        String pro = PromptTemplates.buildTeoriaSystemPrompt(
+                ModeloIA.PRO, NivelAcademico.SECUNDARIA, ModeloIA.PRO.getDefaultParrafosTeoria());
+
+        assertThat(flash).contains(
+                "Nunca respondas como un asistente conversacional",
+                "No incluyas saludos",
+                "despedidas",
+                "Aquí tienes",
+                "explicaciones sobre la IA",
+                "EXCLUSIVAMENTE contenido académico");
+        assertThat(pro).contains(
+                "Nunca respondas como un asistente conversacional",
+                "No incluyas saludos",
+                "despedidas",
+                "Aquí tienes",
+                "explicaciones sobre la IA",
+                "EXCLUSIVAMENTE contenido académico");
+    }
+
+    @Test
+    void shouldUseProvidedSourceAsPrimaryAndOnlyComplementWhenInsufficient() {
+        String systemPrompt = PromptTemplates.buildTeoriaSystemPrompt(
+                ModeloIA.PRO, NivelAcademico.UNIVERSITARIO, ModeloIA.PRO.getDefaultParrafosTeoria());
+        String userPrompt = PromptTemplates.buildUserPrompt(
+                "Programación", "Pilas", "Universitario", "Texto extraído de la fuente");
+
+        assertThat(systemPrompt)
+                .containsIgnoringCase("fuente principal")
+                .containsIgnoringCase("solo complementa")
+                .containsIgnoringCase("insuficiente");
+        assertThat(userPrompt)
+                .contains("Texto extraído de la fuente")
+                .containsIgnoringCase("referencia principal");
+    }
+
+    @Test
     void shouldFollowFlexibleSpineInTeoriaSystemPrompt() {
         String prompt = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.PRO, NivelAcademico.UNIVERSITARIO, ModeloIA.PRO.getDefaultParrafosTeoria());
 
@@ -45,8 +103,10 @@ class PromptTemplatesTest {
         String tutor = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.FLASH, NivelAcademico.UNIVERSITARIO, ModeloIA.FLASH.getDefaultParrafosTeoria());
         String catedratico = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.PRO, NivelAcademico.UNIVERSITARIO, ModeloIA.PRO.getDefaultParrafosTeoria());
 
-        assertThat(tutor).contains(ModeloIA.FLASH.getEstiloTeoria());
-        assertThat(catedratico).contains(ModeloIA.PRO.getEstiloTeoria());
+        // The depth contract per tier now lives in teoria-basico.st / teoria-avanzado.st,
+        // not in ModeloIA.estiloTeoria.
+        assertThat(tutor).containsIgnoringCase("breve");
+        assertThat(catedratico).containsIgnoringCase("desarrollo completo");
         assertThat(tutor).isNotEqualTo(catedratico);
 
         // The mandatory intro/development/conclusion structure applies to every tier.
@@ -58,6 +118,32 @@ class PromptTemplatesTest {
         String prompt = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.PRO, NivelAcademico.SECUNDARIA, ModeloIA.PRO.getDefaultParrafosTeoria());
 
         assertThat(prompt).doesNotContain("```");
+    }
+
+    @Test
+    void shouldRequireProgressiveSourceGroundedTheoryWithoutRepetition() {
+        String prompt = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.PRO, NivelAcademico.UNIVERSITARIO, ModeloIA.PRO.getDefaultParrafosTeoria());
+
+        assertThat(prompt)
+            .contains("mapa mental")
+            .contains("una sola vez")
+            .contains("información nueva")
+            .contains("contenido fuente")
+            .containsIgnoringCase("introducción")
+            .containsIgnoringCase("desarrollo")
+            .containsIgnoringCase("conclusión");
+    }
+
+    @Test
+    void shouldRequireFinalSemanticDeduplicationReview() {
+        String prompt = PromptTemplates.buildTeoriaSystemPrompt(ModeloIA.PRO, NivelAcademico.UNIVERSITARIO, ModeloIA.PRO.getDefaultParrafosTeoria());
+
+        assertThat(prompt)
+            .contains("revisión final")
+            .contains("elimina o fusiona")
+            .contains("aporte exclusivo")
+            .contains("detalles concretos")
+            .contains("contenido fuente");
     }
 
     @Test
