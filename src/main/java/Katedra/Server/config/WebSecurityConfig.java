@@ -75,7 +75,7 @@ public class WebSecurityConfig {
                 .authenticationEntryPoint((request, response, authException) ->
                         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED))
             )
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authenticationProvider(authenticationProvider)
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
