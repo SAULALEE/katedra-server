@@ -21,6 +21,10 @@ import java.util.Set;
  * @param numeroPreguntas    requested evaluation question count; null defaults to the
  *                           tier's default. Must fall within the selected model tier's
  *                           [min, max] range.
+ * @param numeroModulos      requested outline módulo (unidad) count; null defaults to the
+ *                           tier's default. Each tier only allows its own two discrete
+ *                           values ({@link ModeloIA#getMinModulos()} or
+ *                           {@link ModeloIA#getMaxModulos()}), never a continuous range.
  */
 @JsonDeserialize(using = GenerarMaterialRequestDTODeserializer.class)
 public record GenerarMaterialRequestDTO(
@@ -29,5 +33,16 @@ public record GenerarMaterialRequestDTO(
     Set<PiezaMaterial> regenerarPiezas,
     Integer numeroDiapositivas,
     Integer numeroParrafos,
-    Integer numeroPreguntas
-) {}
+    Integer numeroPreguntas,
+    Integer numeroModulos
+) {
+    public GenerarMaterialRequestDTO(
+            Set<PiezaMaterial> piezas,
+            ModeloIA modelo,
+            Set<PiezaMaterial> regenerarPiezas,
+            Integer numeroDiapositivas,
+            Integer numeroParrafos,
+            Integer numeroPreguntas) {
+        this(piezas, modelo, regenerarPiezas, numeroDiapositivas, numeroParrafos, numeroPreguntas, null);
+    }
+}

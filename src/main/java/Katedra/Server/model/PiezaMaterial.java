@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
  * JSON values are lowercase Spanish to match the frontend contract.
  */
 public enum PiezaMaterial {
+    ESTRUCTURA("estructura"),
     TEORIA("teoria"),
     EVALUACION("evaluacion"),
     DIAPOSITIVAS("diapositivas");

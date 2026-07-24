@@ -13,13 +13,23 @@ public record TemarioRequestDTO(
     String gradoAcademico,
     @NotBlank(message = "La asignatura es obligatoria")
     String asignaturaId,
-    ModeloGeneracion modeloGeneracion
+    ModeloGeneracion modeloGeneracion,
+    Integer numeroModulos
 ) {
     public TemarioRequestDTO(
             String titulo,
             String descripcion,
             String gradoAcademico,
             String asignaturaId) {
-        this(titulo, descripcion, gradoAcademico, asignaturaId, null);
+        this(titulo, descripcion, gradoAcademico, asignaturaId, null, null);
+    }
+
+    public TemarioRequestDTO(
+            String titulo,
+            String descripcion,
+            String gradoAcademico,
+            String asignaturaId,
+            ModeloGeneracion modeloGeneracion) {
+        this(titulo, descripcion, gradoAcademico, asignaturaId, modeloGeneracion, null);
     }
 }
