@@ -13,6 +13,7 @@ import java.util.Map;
 public record ContenidoTemarioResponseDTO(
     String id,
     String temarioId,
+    String estructura,
     String teoria,
     List<EvaluacionPreguntaDTO> evaluacion,
     List<DiapositivaDTO> diapositivas,

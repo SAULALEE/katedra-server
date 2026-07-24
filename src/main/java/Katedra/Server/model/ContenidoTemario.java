@@ -23,6 +23,9 @@ public class ContenidoTemario {
     @JoinColumn(name = "temario_id", nullable = false, unique = true)
     private Temario temario;
 
+    @Column(name = "estructura", columnDefinition = "LONGTEXT")
+    private String estructura;
+
     @Column(name = "teoria", columnDefinition = "LONGTEXT")
     private String teoria;
 
@@ -57,6 +60,9 @@ public class ContenidoTemario {
 
     public Temario getTemario() { return temario; }
     public void setTemario(Temario temario) { this.temario = temario; }
+
+    public String getEstructura() { return estructura; }
+    public void setEstructura(String estructura) { this.estructura = estructura; }
 
     public String getTeoria() { return teoria; }
     public void setTeoria(String teoria) { this.teoria = teoria; }

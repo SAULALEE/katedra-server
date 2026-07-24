@@ -11,5 +11,6 @@ public record TemarioResponseDTO(
     String asignatura,
     boolean favorito,
     LocalDateTime createdAt,
-    LocalDateTime updatedAt
+    LocalDateTime updatedAt,
+    int progreso
 ) {}

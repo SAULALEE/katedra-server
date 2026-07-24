@@ -51,8 +51,9 @@ public class TemarioController {
         String userEmail = authentication.getName();
         TemarioResponseDTO created = temarioService.createTemario(userEmail, request);
         var generationRequest = new Katedra.Server.dto.GenerarMaterialRequestDTO(
-                Set.of(Katedra.Server.model.PiezaMaterial.TEORIA),
-                resolveModeloGeneracion(request.modeloGeneracion()), null, null, null, null);
+                Set.of(Katedra.Server.model.PiezaMaterial.ESTRUCTURA),
+                resolveModeloGeneracion(request.modeloGeneracion()), null, null, null, null,
+                request.numeroModulos());
         return contenidoTemarioService.generarMaterial(created.id(), userEmail, generationRequest)
                 .thenApply(content -> new ResponseEntity<>(created, HttpStatus.CREATED));
     }
@@ -67,13 +68,14 @@ public class TemarioController {
             @Pattern(regexp = "^[^,;]+$", message = "Solo se permite un grado académico")
             String gradoAcademico,
             @RequestParam(defaultValue = "BASICO") ModeloGeneracion modeloGeneracion,
+            @RequestParam(required = false) Integer numeroModulos,
             Authentication authentication) {
         String userEmail = authentication.getName();
         TemarioUploadResponseDTO created = temarioService.cargarTemarioArchivo(
                 userEmail, file, titulo, asignaturaId, gradoAcademico);
         var generationRequest = new Katedra.Server.dto.GenerarMaterialRequestDTO(
-                Set.of(Katedra.Server.model.PiezaMaterial.TEORIA),
-                modeloGeneracion.toModeloIA(), null, null, null, null);
+                Set.of(Katedra.Server.model.PiezaMaterial.ESTRUCTURA),
+                modeloGeneracion.toModeloIA(), null, null, null, null, numeroModulos);
         return contenidoTemarioService.generarMaterial(created.temario().id(), userEmail, generationRequest)
                 .thenApply(content -> new ResponseEntity<>(created, HttpStatus.CREATED));
     }
@@ -85,8 +87,9 @@ public class TemarioController {
         String userEmail = authentication.getName();
         TemarioUploadResponseDTO created = temarioService.cargarTemarioUrl(userEmail, request);
         var generationRequest = new Katedra.Server.dto.GenerarMaterialRequestDTO(
-                Set.of(Katedra.Server.model.PiezaMaterial.TEORIA),
-                resolveModeloGeneracion(request.modeloGeneracion()), null, null, null, null);
+                Set.of(Katedra.Server.model.PiezaMaterial.ESTRUCTURA),
+                resolveModeloGeneracion(request.modeloGeneracion()), null, null, null, null,
+                request.numeroModulos());
         return contenidoTemarioService.generarMaterial(created.temario().id(), userEmail, generationRequest)
                 .thenApply(content -> new ResponseEntity<>(created, HttpStatus.CREATED));
     }

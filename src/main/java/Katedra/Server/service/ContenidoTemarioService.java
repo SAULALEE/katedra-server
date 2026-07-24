@@ -60,13 +60,18 @@ public class ContenidoTemarioService {
 
     @Transactional(readOnly = true)
     public ContenidoFuenteResponseDTO getFuenteByTemarioId(String temarioId, String userEmail) {
-        findOwnedTemario(temarioId, userEmail);
+        Temario temario = findOwnedTemario(temarioId, userEmail);
         ContenidoTemario entity = contenidoTemarioRepository.findByTemarioId(temarioId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Contenido fuente no disponible"));
-        String fuente = entity.getContenidoFuente();
+                .orElse(null);
+        String fuente = entity != null ? entity.getContenidoFuente() : null;
         if (fuente == null || fuente.isBlank()) {
-            fuente = entity.getTeoria();
+            fuente = entity != null ? entity.getEstructura() : null;
+        }
+        if (fuente == null || fuente.isBlank()) {
+            fuente = entity != null ? entity.getTeoria() : null;
+        }
+        if (fuente == null || fuente.isBlank()) {
+            fuente = temario.getDescripcion();
         }
         if (fuente == null || fuente.isBlank()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contenido fuente no disponible");
@@ -95,11 +100,16 @@ public class ContenidoTemarioService {
         int numeroDiapositivas = resolverNumeroDiapositivas(modeloTier, request);
         int numeroParrafos = resolverNumeroParrafos(modeloTier, request);
         int numeroPreguntas = resolverNumeroPreguntas(modeloTier, request);
-        // Source text for teoría: prefers the ingested content (file/URL) already stored
-        // as teoría, falling back to the syllabus description for manually created ones.
-        String fuente = contenido.getTeoria() != null && !contenido.getTeoria().isBlank()
-                ? contenido.getTeoria()
-                : temario.getDescripcion();
+        int numeroModulos = resolverNumeroModulos(modeloTier, request);
+        // Source text for estructura/teoría: prefers the already-generated outline
+        // (estructura) so teoría develops exactly the topics/subtopics it defines, then
+        // falls back to previously generated teoría (self-refinement on regeneration),
+        // and finally to the raw syllabus description for a first-ever generation.
+        String fuente = contenido.getEstructura() != null && !contenido.getEstructura().isBlank()
+                ? contenido.getEstructura()
+                : contenido.getTeoria() != null && !contenido.getTeoria().isBlank()
+                        ? contenido.getTeoria()
+                        : temario.getDescripcion();
 
         Set<PiezaMaterial> piezas = request.piezas();
         boolean generaTeoriaAhora = piezas.contains(PiezaMaterial.TEORIA);
@@ -127,7 +137,7 @@ public class ContenidoTemarioService {
 
         Map<PiezaMaterial, CompletableFuture<?>> futures = new EnumMap<>(PiezaMaterial.class);
         for (PiezaMaterial pieza : piezas) {
-            futures.put(pieza, dispatch(pieza, temario, nivelGeneracion, teoriaFuture, modeloTier, numeroDiapositivas, numeroPreguntas));
+            futures.put(pieza, dispatch(pieza, temario, nivelGeneracion, fuente, teoriaFuture, modeloTier, numeroDiapositivas, numeroPreguntas, numeroModulos));
         }
 
         // Each failure is caught individually so one failed piece (e.g. an OpenAI
@@ -237,17 +247,39 @@ public class ContenidoTemarioService {
     }
 
     /**
+     * Resolves the outline módulo (unidad) count against the chosen tier: null falls back
+     * to the tier default; an explicit value is validated only when estructura is actually
+     * requested. Unlike diapositivas/parrafos/preguntas, this is not a continuous [min, max]
+     * range — each tier only allows its own two discrete options (compact/standard for
+     * Tutor, detailed/exhaustive for Catedrático), rejecting anything else with 400.
+     */
+    private int resolverNumeroModulos(ModeloIA modeloTier, GenerarMaterialRequestDTO request) {
+        Integer solicitado = request.numeroModulos();
+        if (solicitado == null) {
+            return modeloTier.getDefaultModulos();
+        }
+        if (request.piezas().contains(PiezaMaterial.ESTRUCTURA)
+                && solicitado != modeloTier.getMinModulos() && solicitado != modeloTier.getMaxModulos()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format(
+                    "El número de módulos para el modelo %s debe ser %d o %d",
+                    modeloTier.name(), modeloTier.getMinModulos(), modeloTier.getMaxModulos()));
+        }
+        return solicitado;
+    }
+
+    /**
      * Dispatches a single piece. EVALUACION/DIAPOSITIVAS chain off {@code teoriaFuture}
      * so they always run after (and are grounded in) the theory text, whether it was
      * just generated in this same request or already persisted.
      */
     private CompletableFuture<?> dispatch(
-            PiezaMaterial pieza, Temario temario, NivelAcademico nivel, CompletableFuture<String> teoriaFuture,
-            ModeloIA modeloTier, int numeroDiapositivas, int numeroPreguntas) {
+            PiezaMaterial pieza, Temario temario, NivelAcademico nivel, String fuente, CompletableFuture<String> teoriaFuture,
+            ModeloIA modeloTier, int numeroDiapositivas, int numeroPreguntas, int numeroModulos) {
         String asignatura = temario.getAsignatura().getNombre();
         String titulo = temario.getTitulo();
         String grado = temario.getGradoAcademico();
         return switch (pieza) {
+            case ESTRUCTURA -> aiContentGeneratorService.generarEstructura(asignatura, titulo, nivel, fuente, modeloTier, numeroModulos);
             case TEORIA -> teoriaFuture;
             case EVALUACION -> teoriaFuture.thenCompose(teoriaTexto ->
                     aiContentGeneratorService.generarEvaluacion(asignatura, titulo, nivel, teoriaTexto, modeloTier, numeroPreguntas));
@@ -259,6 +291,7 @@ public class ContenidoTemarioService {
     @SuppressWarnings("unchecked")
     private void aplicarResultado(ContenidoTemario contenido, PiezaMaterial pieza, Object resultado) {
         switch (pieza) {
+            case ESTRUCTURA -> contenido.setEstructura((String) resultado);
             case TEORIA -> contenido.setTeoria((String) resultado);
             case EVALUACION -> contenido.setEvaluacion((List<EvaluacionPreguntaDTO>) resultado);
             case DIAPOSITIVAS -> contenido.setDiapositivas((List<DiapositivaDTO>) resultado);
@@ -271,6 +304,7 @@ public class ContenidoTemarioService {
         return new ContenidoTemarioResponseDTO(
                 entity.getId(),
                 entity.getTemario().getId(),
+                entity.getEstructura(),
                 entity.getTeoria(),
                 entity.getEvaluacion(),
                 entity.getDiapositivas(),

@@ -210,6 +210,22 @@ class PromptTemplatesTest {
     }
 
     @Test
+    void shouldEmbedRequestedModuloCountInEstructuraPrompt() {
+        String flash = PromptTemplates.buildEstructuraSystemPrompt(NivelAcademico.UNIVERSITARIO, 6);
+        String pro = PromptTemplates.buildEstructuraSystemPrompt(NivelAcademico.UNIVERSITARIO, 10);
+
+        assertThat(flash).contains("exactamente 6 unidades");
+        assertThat(pro).contains("exactamente 10 unidades");
+    }
+
+    @Test
+    void shouldEmbedLevelRubricInEstructuraPrompt() {
+        String prompt = PromptTemplates.buildEstructuraSystemPrompt(NivelAcademico.POSGRADO, 8);
+
+        assertThat(prompt).contains(NivelAcademico.POSGRADO.getRubrica());
+    }
+
+    @Test
     void shouldRequireCoverSlideAndTheoryGroundingInDiapositivasPrompt() {
         String prompt = PromptTemplates.buildDiapositivasSystemPrompt(8);
 

@@ -48,6 +48,10 @@ public class GenerarMaterialRequestDTODeserializer extends JsonDeserializer<Gene
                 ? root.get("numeroPreguntas").asInt()
                 : null;
 
-        return new GenerarMaterialRequestDTO(piezas, modelo, regenerarPiezas, numeroDiapositivas, numeroParrafos, numeroPreguntas);
+        Integer numeroModulos = root.has("numeroModulos") && root.get("numeroModulos") != null
+                ? root.get("numeroModulos").asInt()
+                : null;
+
+        return new GenerarMaterialRequestDTO(piezas, modelo, regenerarPiezas, numeroDiapositivas, numeroParrafos, numeroPreguntas, numeroModulos);
     }
 }

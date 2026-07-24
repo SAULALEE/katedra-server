@@ -179,6 +179,32 @@ class ContenidoTemarioServiceTest {
     }
 
     @Test
+    void shouldReturnEstructuraWhenNoContenidoFuenteOrTeoriaExist() {
+        ContenidoTemario existing = contenidoConId(mockTemario);
+        existing.setEstructura("1. Unidad 1\n1.1. Tema 1");
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456"))
+                .willReturn(Optional.of(existing));
+
+        var response = contenidoTemarioService.getFuenteByTemarioId(
+                "temario-uuid-456", "profesor@katedra.com");
+
+        assertThat(response.contenidoFuente()).isEqualTo("1. Unidad 1\n1.1. Tema 1");
+    }
+
+    @Test
+    void shouldReturnSyllabusDescriptionWhenNoContentGeneratedYet() {
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456"))
+                .willReturn(Optional.empty());
+
+        var response = contenidoTemarioService.getFuenteByTemarioId(
+                "temario-uuid-456", "profesor@katedra.com");
+
+        assertThat(response.contenidoFuente()).isEqualTo("Pilas y colas");
+    }
+
+    @Test
     void shouldRejectSourceAccessFromAnotherUser() {
         given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
 
@@ -672,5 +698,95 @@ class ContenidoTemarioServiceTest {
         assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         verify(aiContentGeneratorService, never())
                 .generarEvaluacion(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), anyInt());
+    }
+
+    // --- generarMaterial: numeroModulos ---
+
+    @Test
+    void shouldUseTierDefaultWhenNumeroModulosIsNull() throws ExecutionException, InterruptedException {
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.empty());
+        given(aiContentGeneratorService.generarEstructura(
+                anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class),
+                eq(ModeloIA.FLASH.getDefaultModulos())))
+                .willReturn(CompletableFuture.completedFuture("1. Unidad"));
+        stubSaveEchoingWithId();
+
+        GenerarMaterialRequestDTO request =
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.ESTRUCTURA), ModeloIA.FLASH, null, null, null, null);
+
+        ContenidoTemarioResponseDTO response = contenidoTemarioService
+                .generarMaterial("temario-uuid-456", "profesor@katedra.com", request).get();
+
+        assertThat(response.estructura()).isEqualTo("1. Unidad");
+        verify(aiContentGeneratorService).generarEstructura(
+                anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class),
+                eq(ModeloIA.FLASH.getDefaultModulos()));
+    }
+
+    @Test
+    void shouldPassThroughExplicitNumeroModulosMatchingTierMinCount() throws ExecutionException, InterruptedException {
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.empty());
+        given(aiContentGeneratorService.generarEstructura(
+                anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), eq(4)))
+                .willReturn(CompletableFuture.completedFuture("1. Unidad"));
+        stubSaveEchoingWithId();
+
+        GenerarMaterialRequestDTO request =
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.ESTRUCTURA), ModeloIA.FLASH, null, null, null, null, 4);
+
+        ContenidoTemarioResponseDTO response = contenidoTemarioService
+                .generarMaterial("temario-uuid-456", "profesor@katedra.com", request).get();
+
+        assertThat(response.estructura()).isEqualTo("1. Unidad");
+        verify(aiContentGeneratorService).generarEstructura(
+                anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), eq(4));
+    }
+
+    @Test
+    void shouldAllowNumeroModulosMatchingTierMaxCount() throws ExecutionException, InterruptedException {
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.empty());
+        given(aiContentGeneratorService.generarEstructura(
+                anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), eq(10)))
+                .willReturn(CompletableFuture.completedFuture("1. Unidad"));
+        stubSaveEchoingWithId();
+
+        GenerarMaterialRequestDTO request =
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.ESTRUCTURA), ModeloIA.PRO, null, null, null, null, 10);
+
+        ContenidoTemarioResponseDTO response = contenidoTemarioService
+                .generarMaterial("temario-uuid-456", "profesor@katedra.com", request).get();
+
+        assertThat(response.estructura()).isEqualTo("1. Unidad");
+    }
+
+    @Test
+    void shouldThrowWhenNumeroModulosIsNotOneOfTheTierAllowedValues() {
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+
+        GenerarMaterialRequestDTO request =
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.ESTRUCTURA), ModeloIA.FLASH, null, null, null, null, 5);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                contenidoTemarioService.generarMaterial("temario-uuid-456", "profesor@katedra.com", request));
+
+        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(aiContentGeneratorService, never())
+                .generarEstructura(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), anyInt());
+    }
+
+    @Test
+    void shouldThrowWhenNumeroModulosFromOtherTierIsUsedWithFlash() {
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+
+        GenerarMaterialRequestDTO request =
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.ESTRUCTURA), ModeloIA.FLASH, null, null, null, null, 8);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                contenidoTemarioService.generarMaterial("temario-uuid-456", "profesor@katedra.com", request));
+
+        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 }
