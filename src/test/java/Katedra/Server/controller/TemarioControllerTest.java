@@ -74,7 +74,8 @@ class TemarioControllerTest {
                 "Programacion",
                 false,
                 LocalDateTime.now(),
-                LocalDateTime.now()
+                LocalDateTime.now(),
+                0
         );
     }
 
@@ -91,7 +92,7 @@ class TemarioControllerTest {
         given(temarioService.createTemario(eq("profesor@katedra.com"), any(TemarioRequestDTO.class)))
                 .willReturn(mockResponse);
         var generatedContent = new Katedra.Server.dto.ContenidoTemarioResponseDTO(
-                "contenido-uuid-789", "temario-uuid-123", "## Teoria generada",
+                "contenido-uuid-789", "temario-uuid-123", "## Estructura generada", null,
                 null, null, "basico", Map.of());
         given(contenidoTemarioService.generarMaterial(
                 eq("temario-uuid-123"), eq("profesor@katedra.com"),
@@ -115,8 +116,44 @@ class TemarioControllerTest {
         verify(contenidoTemarioService).generarMaterial(
                 eq("temario-uuid-123"), eq("profesor@katedra.com"),
                 org.mockito.ArgumentMatchers.argThat(request ->
-                        request.piezas().equals(Set.of(PiezaMaterial.TEORIA))
+                        request.piezas().equals(Set.of(PiezaMaterial.ESTRUCTURA))
                                 && request.modelo() == Katedra.Server.model.ModeloIA.FLASH));
+    }
+
+    @Test
+    void shouldPassNumeroModulosFromRequestToGenerationRequest() throws Exception {
+        String jsonRequest = """
+                {
+                    "titulo": "Curso de Java",
+                    "descripcion": "Aprende Java 21",
+                    "gradoAcademico": "universitario",
+                    "asignaturaId": "asignatura-1",
+                    "numeroModulos": 6
+                }
+                """;
+        given(temarioService.createTemario(eq("profesor@katedra.com"), any(TemarioRequestDTO.class)))
+                .willReturn(mockResponse);
+        var generatedContent = new Katedra.Server.dto.ContenidoTemarioResponseDTO(
+                "contenido-uuid-789", "temario-uuid-123", "## Estructura generada", null,
+                null, null, "basico", Map.of());
+        given(contenidoTemarioService.generarMaterial(
+                eq("temario-uuid-123"), eq("profesor@katedra.com"),
+                any(Katedra.Server.dto.GenerarMaterialRequestDTO.class)))
+                .willReturn(CompletableFuture.completedFuture(generatedContent));
+
+        var mvcResult = mockMvc.perform(post("/temarios")
+                        .principal(mockPrincipal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonRequest))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isCreated());
+
+        verify(contenidoTemarioService).generarMaterial(
+                eq("temario-uuid-123"), eq("profesor@katedra.com"),
+                org.mockito.ArgumentMatchers.argThat(request -> Integer.valueOf(6).equals(request.numeroModulos())));
     }
 
     @Test
@@ -172,7 +209,7 @@ class TemarioControllerTest {
                 any(Katedra.Server.dto.GenerarMaterialRequestDTO.class)))
                 .willReturn(CompletableFuture.completedFuture(
                         new Katedra.Server.dto.ContenidoTemarioResponseDTO(
-                                "contenido-uuid-789", "temario-uuid-123", "## Teoria generada",
+                                "contenido-uuid-789", "temario-uuid-123", "## Estructura generada", null,
                                 null, null, "basico", Map.of())));
 
         var mvcResult = mockMvc.perform(multipart("/temarios/cargar/archivo")
@@ -180,7 +217,7 @@ class TemarioControllerTest {
                         .param("titulo", "Curso de Java")
                         .param("asignaturaId", "asignatura-1")
                         .param("gradoAcademico", "Universidad")
-                        .param("modeloGeneracion", "AVANZADO")
+                        .param("modeloGeneracion", "CATEDRATICO")
                         .principal(mockPrincipal))
                 .andExpect(request().asyncStarted())
                 .andReturn();
@@ -200,8 +237,48 @@ class TemarioControllerTest {
         verify(contenidoTemarioService).generarMaterial(
                 eq("temario-uuid-123"), eq("profesor@katedra.com"),
                 org.mockito.ArgumentMatchers.argThat(request ->
-                        request.piezas().equals(Set.of(PiezaMaterial.TEORIA))
+                        request.piezas().equals(Set.of(PiezaMaterial.ESTRUCTURA))
                                 && request.modelo() == Katedra.Server.model.ModeloIA.PRO));
+    }
+
+    @Test
+    void shouldPassNumeroModulosFromArchivoRequestToGenerationRequest() throws Exception {
+        var file = new org.springframework.mock.web.MockMultipartFile(
+                "file", "temario.md", "text/markdown", "# Temario".getBytes());
+        var uploadResponse = new TemarioUploadResponseDTO(
+                mockResponse, "contenido-uuid-789", "temario.md", "text/markdown", null, 9);
+        given(temarioService.cargarTemarioArchivo(
+                eq("profesor@katedra.com"),
+                any(org.springframework.web.multipart.MultipartFile.class),
+                eq("Curso de Java"),
+                eq("asignatura-1"),
+                eq("Universidad")))
+                .willReturn(uploadResponse);
+        given(contenidoTemarioService.generarMaterial(
+                eq("temario-uuid-123"), eq("profesor@katedra.com"),
+                any(Katedra.Server.dto.GenerarMaterialRequestDTO.class)))
+                .willReturn(CompletableFuture.completedFuture(
+                        new Katedra.Server.dto.ContenidoTemarioResponseDTO(
+                                "contenido-uuid-789", "temario-uuid-123", "## Estructura generada", null,
+                                null, null, "avanzado", Map.of())));
+
+        var mvcResult = mockMvc.perform(multipart("/temarios/cargar/archivo")
+                        .file(file)
+                        .param("titulo", "Curso de Java")
+                        .param("asignaturaId", "asignatura-1")
+                        .param("gradoAcademico", "Universidad")
+                        .param("modeloGeneracion", "CATEDRATICO")
+                        .param("numeroModulos", "8")
+                        .principal(mockPrincipal))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isCreated());
+
+        verify(contenidoTemarioService).generarMaterial(
+                eq("temario-uuid-123"), eq("profesor@katedra.com"),
+                org.mockito.ArgumentMatchers.argThat(request -> Integer.valueOf(8).equals(request.numeroModulos())));
     }
 
     @Test
@@ -212,7 +289,7 @@ class TemarioControllerTest {
                     "titulo": "Curso Web",
                     "asignaturaId": "asignatura-1",
                     "gradoAcademico": "Universidad",
-                    "modeloGeneracion": "AVANZADO"
+                    "modeloGeneracion": "CATEDRATICO"
                 }
                 """;
         var uploadResponse = new TemarioUploadResponseDTO(
@@ -226,7 +303,7 @@ class TemarioControllerTest {
                 any(Katedra.Server.dto.GenerarMaterialRequestDTO.class)))
                 .willReturn(CompletableFuture.completedFuture(
                         new Katedra.Server.dto.ContenidoTemarioResponseDTO(
-                                "contenido-uuid-790", "temario-uuid-123", "## Teoria generada",
+                                "contenido-uuid-790", "temario-uuid-123", "## Estructura generada", null,
                                 null, null, "basico", Map.of())));
 
         var mvcResult = mockMvc.perform(post("/temarios/cargar/url")
@@ -248,8 +325,49 @@ class TemarioControllerTest {
         verify(contenidoTemarioService).generarMaterial(
                 eq("temario-uuid-123"), eq("profesor@katedra.com"),
                 org.mockito.ArgumentMatchers.argThat(request ->
-                        request.piezas().equals(Set.of(PiezaMaterial.TEORIA))
+                        request.piezas().equals(Set.of(PiezaMaterial.ESTRUCTURA))
                                 && request.modelo() == Katedra.Server.model.ModeloIA.PRO));
+    }
+
+    @Test
+    void shouldPassNumeroModulosFromUrlRequestToGenerationRequest() throws Exception {
+        String jsonRequest = """
+                {
+                    "url": "https://example.com/temario",
+                    "titulo": "Curso Web",
+                    "asignaturaId": "asignatura-1",
+                    "gradoAcademico": "Universidad",
+                    "modeloGeneracion": "CATEDRATICO",
+                    "numeroModulos": 10
+                }
+                """;
+        var uploadResponse = new TemarioUploadResponseDTO(
+                mockResponse, "contenido-uuid-790", null, "text/html", "https://example.com/temario", 120);
+        given(temarioService.cargarTemarioUrl(
+                eq("profesor@katedra.com"),
+                any(TemarioUrlRequestDTO.class)))
+                .willReturn(uploadResponse);
+        given(contenidoTemarioService.generarMaterial(
+                eq("temario-uuid-123"), eq("profesor@katedra.com"),
+                any(Katedra.Server.dto.GenerarMaterialRequestDTO.class)))
+                .willReturn(CompletableFuture.completedFuture(
+                        new Katedra.Server.dto.ContenidoTemarioResponseDTO(
+                                "contenido-uuid-790", "temario-uuid-123", "## Estructura generada", null,
+                                null, null, "avanzado", Map.of())));
+
+        var mvcResult = mockMvc.perform(post("/temarios/cargar/url")
+                        .principal(mockPrincipal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonRequest))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isCreated());
+
+        verify(contenidoTemarioService).generarMaterial(
+                eq("temario-uuid-123"), eq("profesor@katedra.com"),
+                org.mockito.ArgumentMatchers.argThat(request -> Integer.valueOf(10).equals(request.numeroModulos())));
     }
 
     @Test
@@ -335,7 +453,7 @@ class TemarioControllerTest {
         var favoriteResponse = new TemarioResponseDTO(
                 mockResponse.id(), mockResponse.titulo(), mockResponse.descripcion(),
                 mockResponse.gradoAcademico(), mockResponse.asignaturaId(),
-                mockResponse.asignatura(), true, mockResponse.createdAt(), mockResponse.updatedAt());
+                mockResponse.asignatura(), true, mockResponse.createdAt(), mockResponse.updatedAt(), 0);
         given(temarioService.updateFavorito(
                 "temario-uuid-123", "profesor@katedra.com", true))
                 .willReturn(favoriteResponse);
@@ -433,7 +551,7 @@ class TemarioControllerTest {
     @Test
     void shouldGetContenidoByTemarioId() throws Exception {
         var contenidoResponse = new Katedra.Server.dto.ContenidoTemarioResponseDTO(
-                "contenido-uuid-789", "temario-uuid-123", "## Teoría",
+                "contenido-uuid-789", "temario-uuid-123", "## Estructura", "## Teoría",
                 List.of(), List.of(), "flash", Map.of());
         given(contenidoTemarioService.getContenidoByTemarioId("temario-uuid-123", "profesor@katedra.com"))
                 .willReturn(contenidoResponse);
@@ -474,7 +592,7 @@ class TemarioControllerTest {
                 }
                 """;
         var contenidoResponse = new Katedra.Server.dto.ContenidoTemarioResponseDTO(
-                "contenido-uuid-789", "temario-uuid-123", null,
+                "contenido-uuid-789", "temario-uuid-123", null, null,
                 List.of(new Katedra.Server.dto.EvaluacionPreguntaDTO(
                         "¿Pregunta?", List.of("A", "B", "C", "D"), 0, "Explicación")),
                 null, "flash", Map.of());

@@ -25,7 +25,7 @@ class ModeloIATest {
         assertThat(ModeloIA.fromValor("o4-mini")).isEqualTo(ModeloIA.PRO);
     }
 
-    /** The ingestion forms speak BASICO/AVANZADO through ModeloGeneracion, never through this enum. */
+    /** The ingestion forms speak TUTOR/CATEDRATICO through ModeloGeneracion (distinct from content generation flow), never through this enum directly. */
     @Test
     void shouldRejectRetiredTierKeys() {
         assertThatThrownBy(() -> ModeloIA.fromValor("basico"))
@@ -38,7 +38,19 @@ class ModeloIATest {
 
     @Test
     void shouldMapIngestionModelsOntoTheBrandedTiers() {
-        assertThat(ModeloGeneracion.BASICO.toModeloIA()).isEqualTo(ModeloIA.FLASH);
-        assertThat(ModeloGeneracion.AVANZADO.toModeloIA()).isEqualTo(ModeloIA.PRO);
+        assertThat(ModeloGeneracion.TUTOR.toModeloIA()).isEqualTo(ModeloIA.FLASH);
+        assertThat(ModeloGeneracion.CATEDRATICO.toModeloIA()).isEqualTo(ModeloIA.PRO);
+    }
+
+    /** Tutor only offers a compact (4) or standard (6) outline; Catedrático only a detailed (8) or exhaustive (10) one. */
+    @Test
+    void shouldRestrictModuloCountToTwoDiscreteOptionsPerTier() {
+        assertThat(ModeloIA.FLASH.getMinModulos()).isEqualTo(4);
+        assertThat(ModeloIA.FLASH.getMaxModulos()).isEqualTo(6);
+        assertThat(ModeloIA.FLASH.getDefaultModulos()).isEqualTo(4);
+
+        assertThat(ModeloIA.PRO.getMinModulos()).isEqualTo(8);
+        assertThat(ModeloIA.PRO.getMaxModulos()).isEqualTo(10);
+        assertThat(ModeloIA.PRO.getDefaultModulos()).isEqualTo(8);
     }
 }

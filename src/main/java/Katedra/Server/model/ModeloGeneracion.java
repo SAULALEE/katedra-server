@@ -2,12 +2,12 @@ package Katedra.Server.model;
 
 /**
  * Generation model options exposed by the temario creation forms. These are the
- * ingestion-facing labels; each maps onto one of Katedra's two branded tiers, so the
- * upload forms keep their BASICO/AVANZADO contract without duplicating tier config.
+ * ingestion-facing labels for syllabus uploads (distinct from the content generation flow).
+ * Each maps onto one of Katedra's two branded tiers, aligned with ModeloIA's display names.
  */
 public enum ModeloGeneracion {
-    BASICO(ModeloIA.FLASH),
-    AVANZADO(ModeloIA.PRO);
+    TUTOR(ModeloIA.FLASH),
+    CATEDRATICO(ModeloIA.PRO);
 
     private final ModeloIA modeloIA;
 

@@ -31,6 +31,8 @@ public final class PromptTemplates {
 
     private static final PromptTemplate TEORIA_SYSTEM_TEMPLATE = loadTemplate("teoria-system.st");
 
+    private static final PromptTemplate ESTRUCTURA_SYSTEM_TEMPLATE = loadTemplate("estructura-system.st");
+
     private static final String TEORIA_BASICO = readResource("teoria-basico.st");
 
     private static final String TEORIA_AVANZADO = readResource("teoria-avanzado.st");
@@ -45,6 +47,13 @@ public final class PromptTemplates {
                 "nivelRubrica", nivel.getRubrica(),
                 "perfilTeoria", resolvePerfilTeoria(modelo),
                 "parrafosInstruccion", buildParrafosInstruccion(numeroParrafos, modelo.getMaxPalabrasTeoria())));
+    }
+
+    public static String buildEstructuraSystemPrompt(NivelAcademico nivel, int numeroModulos) {
+        return ESTRUCTURA_SYSTEM_TEMPLATE.render(Map.of(
+                "katedraContext", KATEDRA_CONTEXT,
+                "nivelRubrica", nivel.getRubrica(),
+                "numeroModulos", numeroModulos));
     }
 
     /**

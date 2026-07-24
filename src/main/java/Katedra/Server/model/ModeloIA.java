@@ -16,6 +16,7 @@ public enum ModeloIA {
             5, 10, 8,
             5, 15, 10,
             1, 10, 5,
+            4, 6, 4,
             null,
             0.5, 2500, false, null,
             """
@@ -38,6 +39,7 @@ public enum ModeloIA {
             10, 20, 15,
             20, 40, 20,
             15, 30, 20,
+            8, 10, 8,
             5000,
             null, 12000, true, "medium",
             """
@@ -88,6 +90,9 @@ public enum ModeloIA {
     private final int minPreguntas;
     private final int maxPreguntas;
     private final int defaultPreguntas;
+    private final int minModulos;
+    private final int maxModulos;
+    private final int defaultModulos;
     private final Integer maxPalabrasTeoria;
     private final Double temperature;
     private final int maxTokens;
@@ -100,6 +105,7 @@ public enum ModeloIA {
              int minDiapositivas, int maxDiapositivas, int defaultDiapositivas,
              int minParrafosTeoria, int maxParrafosTeoria, int defaultParrafosTeoria,
              int minPreguntas, int maxPreguntas, int defaultPreguntas,
+             int minModulos, int maxModulos, int defaultModulos,
              Integer maxPalabrasTeoria,
              Double temperature, int maxTokens, boolean reasoning, String reasoningEffort,
              String estiloTeoria, String estiloEvaluacion) {
@@ -115,6 +121,9 @@ public enum ModeloIA {
         this.minPreguntas = minPreguntas;
         this.maxPreguntas = maxPreguntas;
         this.defaultPreguntas = defaultPreguntas;
+        this.minModulos = minModulos;
+        this.maxModulos = maxModulos;
+        this.defaultModulos = defaultModulos;
         this.maxPalabrasTeoria = maxPalabrasTeoria;
         this.temperature = temperature;
         this.maxTokens = maxTokens;
@@ -171,6 +180,23 @@ public enum ModeloIA {
 
     public int getDefaultPreguntas() {
         return defaultPreguntas;
+    }
+
+    /**
+     * Módulo count is a two-option discrete choice per tier, not a continuous range:
+     * Tutor only offers {@link #getMinModulos()} (compact) or {@link #getMaxModulos()}
+     * (standard); Catedrático only offers its min (detailed) or max (exhaustive).
+     */
+    public int getMinModulos() {
+        return minModulos;
+    }
+
+    public int getMaxModulos() {
+        return maxModulos;
+    }
+
+    public int getDefaultModulos() {
+        return defaultModulos;
     }
 
     /** Null unless the tier caps total theory length by word count (e.g. Catedrático's 5000). */
