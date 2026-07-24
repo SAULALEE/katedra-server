@@ -1,8 +1,11 @@
 package Katedra.Server.controller;
 
+import Katedra.Server.dto.UsuarioCreateRequestDTO;
+import Katedra.Server.dto.UsuarioCreateResponseDTO;
 import Katedra.Server.dto.UsuarioDTO;
 import Katedra.Server.dto.UsuarioUpdateRequestDTO;
 import Katedra.Server.service.UsuarioService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +25,12 @@ public class UsuarioController {
     @GetMapping
     public ResponseEntity<List<UsuarioDTO>> getUsuarios() {
         return ResponseEntity.ok(usuarioService.getAllUsuarios());
+    }
+
+    @PostMapping
+    public ResponseEntity<UsuarioCreateResponseDTO> createUsuario(@RequestBody UsuarioCreateRequestDTO request) {
+        UsuarioCreateResponseDTO created = usuarioService.createAdmin(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping("/{id}")
