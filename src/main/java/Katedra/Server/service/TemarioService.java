@@ -230,6 +230,16 @@ public class TemarioService {
     }
 
     private TemarioResponseDTO mapToDTO(Temario temario) {
+        int progreso = 0;
+        java.util.Optional<ContenidoTemario> ctOpt = contenidoTemarioRepository.findByTemarioId(temario.getId());
+        if (ctOpt.isPresent()) {
+            ContenidoTemario ct = ctOpt.get();
+            if (ct.getEstructura() != null && !ct.getEstructura().isBlank() && !ct.getEstructura().equals("[]")) progreso += 25;
+            if (ct.getTeoria() != null && !ct.getTeoria().isBlank() && !ct.getTeoria().equals("[]")) progreso += 25;
+            if (ct.getEvaluacion() != null && !ct.getEvaluacion().isEmpty()) progreso += 25;
+            if (ct.getDiapositivas() != null && !ct.getDiapositivas().isEmpty()) progreso += 25;
+        }
+
         return new TemarioResponseDTO(
                 temario.getId(),
                 temario.getTitulo(),
@@ -239,7 +249,8 @@ public class TemarioService {
                 temario.getAsignatura().getNombre(),
                 temario.isFavorito(),
                 temario.getCreatedAt(),
-                temario.getUpdatedAt()
+                temario.getUpdatedAt(),
+                progreso
         );
     }
 

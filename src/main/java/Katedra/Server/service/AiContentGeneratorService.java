@@ -34,6 +34,26 @@ public class AiContentGeneratorService {
     }
 
     @Async
+    public CompletableFuture<String> generarEstructura(
+            String asignatura, String titulo, NivelAcademico nivel, String fuente, ModeloIA modelo,
+            int numeroModulos) {
+        try {
+            log.info("Generando estructura [{}] ({} módulos) para tema: {} (nivel {})",
+                    modelo.getDisplayName(), numeroModulos, titulo, nivel.getEtiqueta());
+            String texto = chatClient.prompt()
+                    .system(PromptTemplates.buildEstructuraSystemPrompt(nivel, numeroModulos))
+                    .user(PromptTemplates.buildUserPrompt(asignatura, titulo, nivel.getEtiqueta(), fuente))
+                    .options(OpenAiOptionsFactory.forModelo(modelo))
+                    .call()
+                    .content();
+            return CompletableFuture.completedFuture(texto);
+        } catch (Exception ex) {
+            log.error("Error generando estructura para tema: {}", titulo, ex);
+            return CompletableFuture.failedFuture(ex);
+        }
+    }
+
+    @Async
     public CompletableFuture<String> generarTeoria(
             String asignatura, String titulo, NivelAcademico nivel, String fuente, ModeloIA modelo,
             int numeroParrafos) {

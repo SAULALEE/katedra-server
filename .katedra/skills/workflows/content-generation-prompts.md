@@ -108,7 +108,18 @@ Both pieces are generated **from the theory text**, never from the raw syllabus 
   calls `generarTeoria` twice.
 - Otherwise reuses the persisted `ContenidoTemario.teoria`.
 
-## 8. Roadmap
+## 8. `ESTRUCTURA` — the syllabus outline, distinct from `TEORIA`
+`PiezaMaterial.ESTRUCTURA` generates the temario's table of contents (units/temas/subtemas
+in markdown, no prose) via `buildEstructuraSystemPrompt(nivel)` / `estructura-system.st`.
+This is what `TemarioController` requests automatically on `createTemario` /
+`cargarTemarioArchivo` / `cargarTemarioUrl` — **not** `TEORIA`. `TEORIA` (full essay-style
+lesson content per §3) stays available on-demand via `/generar-material`, but never fires
+implicitly at syllabus creation: a "temario" is an index of topics, not a theory essay,
+so the auto-generation on creation must always request `ESTRUCTURA`, never `TEORIA`. Do
+not merge `ESTRUCTURA` output into `ContenidoTemario.teoria` — it has its own column and
+DTO field so both can coexist and be regenerated independently.
+
+## 9. Roadmap
 Four-phase rollout, each phase reusing this same method + rubric + tier table:
 1. **Teoría** (done) — dynamic `buildTeoriaSystemPrompt(modelo, nivel)`.
 2. **Ejercicios interactivos** (done) — `buildEjerciciosSystemPrompt(modelo, nivel)`,
