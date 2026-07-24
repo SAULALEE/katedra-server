@@ -7,6 +7,7 @@ import Katedra.Server.dto.UsuarioUpdateRequestDTO;
 import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.UsuarioRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -62,7 +63,12 @@ public class UsuarioService {
         );
         usuario.setMustChangePassword(true);
 
-        Usuario saved = usuarioRepository.save(usuario);
+        Usuario saved;
+        try {
+            saved = usuarioRepository.save(usuario);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El email ya está registrado");
+        }
         return new UsuarioCreateResponseDTO(mapToDTO(saved), temporaryPassword);
     }
 
@@ -89,7 +95,11 @@ public class UsuarioService {
         usuario.setRol(request.rol());
         usuario.setUpdatedAt(LocalDateTime.now());
 
-        return mapToDTO(usuarioRepository.save(usuario));
+        try {
+            return mapToDTO(usuarioRepository.save(usuario));
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El email ya está registrado");
+        }
     }
 
     public void deleteUsuario(String id, String authenticatedEmail) {
