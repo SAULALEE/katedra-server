@@ -12,6 +12,7 @@ import Katedra.Server.repository.UsuarioRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -52,15 +53,19 @@ public class AuthService {
 
     public AuthResponseDTO login(AuthLoginRequestDTO request) {
         Usuario usuario = usuarioRepository.findByEmail(request.email())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email o contraseña incorrectos"));
 
         if (usuario.getPassword() == null || usuario.getAuthProvider() != AuthProvider.LOCAL) {
-            throw new RuntimeException("Esta cuenta usa login social");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Esta cuenta usa login social");
         }
 
-        authenticationManager.authenticate(
-            new UsernamePasswordAuthenticationToken(request.email(), request.password())
-        );
+        try {
+            authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.email(), request.password())
+            );
+        } catch (AuthenticationException ex) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email o contraseña incorrectos");
+        }
 
         String jwtToken = jwtService.generateToken(usuario);
         return new AuthResponseDTO(jwtToken, mapToDTO(usuario), usuario.isMustChangePassword());

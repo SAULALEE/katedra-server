@@ -105,18 +105,38 @@ class AuthServiceTest {
     }
 
     @Test
-    void shouldThrowExceptionWhenLoginUserNotFound() {
+    void shouldReturnUnauthorizedWhenLoginUserNotFound() {
         // Arrange
         AuthLoginRequestDTO request = new AuthLoginRequestDTO("notfound@cueva.com", "fuego123");
         given(usuarioRepository.findByEmail(request.email())).willReturn(Optional.empty());
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
             authService.login(request);
         });
 
-        assertThat(exception.getMessage()).isEqualTo("Usuario no encontrado");
+        assertThat(exception.getStatusCode().value()).isEqualTo(401);
+        assertThat(exception.getReason()).isEqualTo("Email o contraseña incorrectos");
         verify(authenticationManager, never()).authenticate(any(UsernamePasswordAuthenticationToken.class));
+    }
+
+    @Test
+    void shouldReturnUnauthorizedWhenLoginPasswordIsIncorrect() {
+        // Arrange
+        AuthLoginRequestDTO request = new AuthLoginRequestDTO("test@cueva.com", "wrongpass");
+        Usuario usuario = new Usuario("test@cueva.com", "encoded_fuego123", "Grog", RolUsuario.ROLE_PROFESOR);
+
+        given(usuarioRepository.findByEmail(request.email())).willReturn(Optional.of(usuario));
+        given(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .willThrow(new org.springframework.security.authentication.BadCredentialsException("bad creds"));
+
+        // Act & Assert
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+            authService.login(request);
+        });
+
+        assertThat(exception.getStatusCode().value()).isEqualTo(401);
+        assertThat(exception.getReason()).isEqualTo("Email o contraseña incorrectos");
     }
 
     @Test
