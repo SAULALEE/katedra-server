@@ -62,10 +62,10 @@ public class WebSecurityConfig {
                 .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                 .requestMatchers("/error").permitAll()
                 // ROLE_ADMIN: user management only
-                .requestMatchers("/usuarios/**").hasRole("ADMIN")
+                .requestMatchers("/usuarios/**", "/api/v1/usuarios/**").hasRole("ADMIN")
                 // ROLE_PROFESOR: academic features only
-                .requestMatchers("/asignaturas/**").hasRole("PROFESOR")
-                .requestMatchers("/temarios/**").hasRole("PROFESOR")
+                .requestMatchers("/asignaturas/**", "/api/v1/asignaturas/**").hasRole("PROFESOR")
+                .requestMatchers("/temarios/**", "/api/v1/temarios/**").hasRole("PROFESOR")
                 // Deny everything else
                 .anyRequest().denyAll()
             )
