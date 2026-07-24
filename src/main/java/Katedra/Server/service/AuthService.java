@@ -3,15 +3,20 @@ package Katedra.Server.service;
 import Katedra.Server.dto.AuthLoginRequestDTO;
 import Katedra.Server.dto.AuthRegisterRequestDTO;
 import Katedra.Server.dto.AuthResponseDTO;
+import Katedra.Server.dto.PasswordChangeRequestDTO;
 import Katedra.Server.dto.UsuarioDTO;
 import Katedra.Server.model.AuthProvider;
 import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.UsuarioRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.LocalDateTime;
 
 @Service
 public class AuthService {
@@ -42,7 +47,7 @@ public class AuthService {
 
         usuarioRepository.save(usuario);
         String jwtToken = jwtService.generateToken(usuario);
-        return new AuthResponseDTO(jwtToken, mapToDTO(usuario));
+        return new AuthResponseDTO(jwtToken, mapToDTO(usuario), usuario.isMustChangePassword());
     }
 
     public AuthResponseDTO login(AuthLoginRequestDTO request) {
@@ -56,9 +61,34 @@ public class AuthService {
         authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(request.email(), request.password())
         );
-        
+
         String jwtToken = jwtService.generateToken(usuario);
-        return new AuthResponseDTO(jwtToken, mapToDTO(usuario));
+        return new AuthResponseDTO(jwtToken, mapToDTO(usuario), usuario.isMustChangePassword());
+    }
+
+    /**
+     * Changes the password of the currently authenticated user, clearing the
+     * mustChangePassword flag so admin-created accounts stop being blocked
+     * after they pick their own password.
+     */
+    public AuthResponseDTO changePassword(String email, PasswordChangeRequestDTO request) {
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+
+        if (usuario.getPassword() == null || usuario.getAuthProvider() != AuthProvider.LOCAL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Esta cuenta usa login social");
+        }
+        if (!passwordEncoder.matches(request.currentPassword(), usuario.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La contraseña actual es incorrecta");
+        }
+
+        usuario.setPassword(passwordEncoder.encode(request.newPassword()));
+        usuario.setMustChangePassword(false);
+        usuario.setUpdatedAt(LocalDateTime.now());
+        usuarioRepository.save(usuario);
+
+        String jwtToken = jwtService.generateToken(usuario);
+        return new AuthResponseDTO(jwtToken, mapToDTO(usuario), false);
     }
 
     public AuthResponseDTO loginOrRegisterSocial(
@@ -80,7 +110,7 @@ public class AuthService {
                         .orElseGet(() -> createSocialUser(authProvider, providerUserId, email, nombre)));
 
         String jwtToken = jwtService.generateToken(usuario);
-        return new AuthResponseDTO(jwtToken, mapToDTO(usuario));
+        return new AuthResponseDTO(jwtToken, mapToDTO(usuario), usuario.isMustChangePassword());
     }
 
     private Usuario linkSocialAccount(

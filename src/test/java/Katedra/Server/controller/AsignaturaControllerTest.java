@@ -45,6 +45,9 @@ class AsignaturaControllerTest {
     @MockitoBean
     private org.springframework.security.core.userdetails.UserDetailsService userDetailsService;
 
+    @MockitoBean
+    private Katedra.Server.repository.UsuarioRepository usuarioRepository;
+
     private final org.springframework.security.authentication.UsernamePasswordAuthenticationToken principal =
             new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
                     "profesor@katedra.com", null);

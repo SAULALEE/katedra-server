@@ -60,6 +60,7 @@ public class UsuarioService {
                 request.nombre().trim(),
                 RolUsuario.ROLE_ADMIN
         );
+        usuario.setMustChangePassword(true);
 
         Usuario saved = usuarioRepository.save(usuario);
         return new UsuarioCreateResponseDTO(mapToDTO(saved), temporaryPassword);

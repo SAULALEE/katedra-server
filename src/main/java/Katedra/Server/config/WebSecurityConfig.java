@@ -61,6 +61,8 @@ public class WebSecurityConfig {
                 .requestMatchers("/auth/**", "/api/v1/auth/**").permitAll()
                 .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                 .requestMatchers("/error").permitAll()
+                // Any authenticated user can change their own password
+                .requestMatchers(HttpMethod.POST, "/usuarios/me/password", "/api/v1/usuarios/me/password").authenticated()
                 // ROLE_ADMIN: user management only
                 .requestMatchers("/usuarios/**", "/api/v1/usuarios/**").hasRole("ADMIN")
                 // ROLE_PROFESOR: academic features only
