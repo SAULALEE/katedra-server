@@ -1,10 +1,14 @@
 package Katedra.Server.controller;
 
+import Katedra.Server.dto.AuthResponseDTO;
+import Katedra.Server.dto.PasswordChangeRequestDTO;
 import Katedra.Server.dto.UsuarioCreateRequestDTO;
 import Katedra.Server.dto.UsuarioCreateResponseDTO;
 import Katedra.Server.dto.UsuarioDTO;
 import Katedra.Server.dto.UsuarioUpdateRequestDTO;
+import Katedra.Server.service.AuthService;
 import Katedra.Server.service.UsuarioService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -17,9 +21,11 @@ import java.util.List;
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
+    private final AuthService authService;
 
-    public UsuarioController(UsuarioService usuarioService) {
+    public UsuarioController(UsuarioService usuarioService, AuthService authService) {
         this.usuarioService = usuarioService;
+        this.authService = authService;
     }
 
     @GetMapping
@@ -31,6 +37,14 @@ public class UsuarioController {
     public ResponseEntity<UsuarioCreateResponseDTO> createUsuario(@RequestBody UsuarioCreateRequestDTO request) {
         UsuarioCreateResponseDTO created = usuarioService.createAdmin(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @PostMapping("/me/password")
+    public ResponseEntity<AuthResponseDTO> changeMyPassword(
+            Authentication authentication,
+            @Valid @RequestBody PasswordChangeRequestDTO request
+    ) {
+        return ResponseEntity.ok(authService.changePassword(authentication.getName(), request));
     }
 
     @GetMapping("/{id}")

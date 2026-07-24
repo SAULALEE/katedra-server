@@ -1,5 +1,7 @@
 package Katedra.Server.config;
 
+import Katedra.Server.model.Usuario;
+import Katedra.Server.repository.UsuarioRepository;
 import Katedra.Server.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -19,12 +21,16 @@ import java.io.IOException;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    private static final int SC_PRECONDITION_REQUIRED = 428;
+
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final UsuarioRepository usuarioRepository;
 
-    public JwtAuthenticationFilter(JwtService jwtService, UserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(JwtService jwtService, UserDetailsService userDetailsService, UsuarioRepository usuarioRepository) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
+        this.usuarioRepository = usuarioRepository;
     }
 
     @Override
@@ -61,9 +67,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 );
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authToken);
+
+                if (!isPasswordChangeRequest(request) && requiresPasswordChange(userEmail)) {
+                    response.setStatus(SC_PRECONDITION_REQUIRED);
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    response.getWriter().write("{\"message\":\"Debes cambiar tu contraseña temporal antes de continuar.\"}");
+                    return;
+                }
             }
         }
         filterChain.doFilter(request, response);
+    }
+
+    private boolean requiresPasswordChange(String userEmail) {
+        return usuarioRepository.findByEmail(userEmail)
+                .map(Usuario::isMustChangePassword)
+                .orElse(false);
+    }
+
+    private boolean isPasswordChangeRequest(HttpServletRequest request) {
+        return request.getRequestURI().endsWith("/usuarios/me/password");
     }
 
     @Override
