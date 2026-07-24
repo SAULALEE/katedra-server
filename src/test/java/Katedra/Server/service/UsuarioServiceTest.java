@@ -12,6 +12,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -84,6 +85,24 @@ class UsuarioServiceTest {
 
         assertThat(exception.getReason()).isEqualTo("El email ya está registrado");
         verify(usuarioRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldReturnConflictWhenCreateAdminRaceLosesUniqueConstraint() {
+        // Arrange: pre-check passes (no row yet), but save() hits the DB unique
+        // constraint because another request inserted the same email first.
+        UsuarioCreateRequestDTO request = new UsuarioCreateRequestDTO("Nuevo Admin", "carrera@katedra.com");
+        given(usuarioRepository.findByEmail("carrera@katedra.com")).willReturn(Optional.empty());
+        given(passwordEncoder.encode(any())).willReturn("encoded_temp");
+        given(usuarioRepository.save(any(Usuario.class)))
+                .willThrow(new DataIntegrityViolationException("Duplicate entry"));
+
+        // Act & Assert
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> usuarioService.createAdmin(request));
+
+        assertThat(exception.getStatusCode().value()).isEqualTo(409);
+        assertThat(exception.getReason()).isEqualTo("El email ya está registrado");
     }
 
     @Test
