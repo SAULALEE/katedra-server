@@ -104,6 +104,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         return path.startsWith("/auth/")
                 || request.getRequestURI().startsWith("/api/v1/auth/")
+                // Stripe sends no Authorization header; the webhook signature is what
+                // authenticates it. Without this the filter would also 428 the callback
+                // for users flagged mustChangePassword.
+                || path.startsWith("/webhooks/")
+                || request.getRequestURI().startsWith("/api/v1/webhooks/")
                 || path.startsWith("/oauth2/")
                 || path.startsWith("/login/oauth2/")
                 || path.equals("/error")
