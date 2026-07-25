@@ -18,6 +18,7 @@ import Katedra.Server.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -39,6 +40,8 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -59,6 +62,11 @@ class ContenidoTemarioServiceTest {
 
     @Mock
     private HistorialEventoService historialEventoService;
+
+    // Must be declared even where a test does not assert on it: without the @Mock,
+    // @InjectMocks silently injects null and every generation path NPEs.
+    @Mock
+    private PlanLimitService planLimitService;
 
     @InjectMocks
     private ContenidoTemarioService contenidoTemarioService;
@@ -793,5 +801,131 @@ class ContenidoTemarioServiceTest {
                 contenidoTemarioService.generarMaterial("temario-uuid-456", "profesor@katedra.com", request));
 
         assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    // --- plan limits ---
+
+    @Test
+    void shouldReserveQuotaBeforeCallingTheAiProvider() throws Exception {
+        // Order is the whole point: reserving after the call would let a user over quota
+        // still burn real OpenAI spend before being told no.
+        ContenidoTemario existing = contenidoConId(mockTemario);
+        existing.setTeoria("## Teoría existente");
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.of(existing));
+        given(aiContentGeneratorService.generarEvaluacion(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), anyInt()))
+                .willReturn(CompletableFuture.completedFuture(mockEvaluacion));
+        stubSaveEchoingWithId();
+
+        GenerarMaterialRequestDTO request =
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.EVALUACION), ModeloIA.FLASH, null, null, null, null);
+
+        contenidoTemarioService.generarMaterial("temario-uuid-456", "profesor@katedra.com", request).get();
+
+        InOrder orden = inOrder(planLimitService, aiContentGeneratorService);
+        orden.verify(planLimitService).validarGeneracion(eq(mockUsuario), eq(ModeloIA.FLASH), any());
+        orden.verify(planLimitService).reservarGeneraciones(mockUsuario, 1);
+        orden.verify(aiContentGeneratorService).generarEvaluacion(
+                anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), anyInt());
+    }
+
+    @Test
+    void shouldReserveOneCreditPerRequestedPiece() throws Exception {
+        ContenidoTemario existing = contenidoConId(mockTemario);
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.of(existing));
+        given(aiContentGeneratorService.generarTeoria(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), anyInt()))
+                .willReturn(CompletableFuture.completedFuture("## Teoría"));
+        given(aiContentGeneratorService.generarEvaluacion(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), anyInt()))
+                .willReturn(CompletableFuture.completedFuture(mockEvaluacion));
+        stubSaveEchoingWithId();
+
+        GenerarMaterialRequestDTO request = new GenerarMaterialRequestDTO(
+                Set.of(PiezaMaterial.TEORIA, PiezaMaterial.EVALUACION), ModeloIA.FLASH, null, null, null, null);
+
+        contenidoTemarioService.generarMaterial("temario-uuid-456", "profesor@katedra.com", request).get();
+
+        verify(planLimitService).reservarGeneraciones(mockUsuario, 2);
+        verify(planLimitService, never()).liberarGeneraciones(any(), anyInt());
+    }
+
+    @Test
+    void shouldRefundOnlyTheFailedPieces() throws Exception {
+        // A partial provider outage must cost the user only what actually got delivered.
+        ContenidoTemario existing = contenidoConId(mockTemario);
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.of(existing));
+        given(aiContentGeneratorService.generarTeoria(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), anyInt()))
+                .willReturn(CompletableFuture.completedFuture("## Teoría"));
+        given(aiContentGeneratorService.generarEvaluacion(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), anyInt()))
+                .willReturn(CompletableFuture.failedFuture(new RuntimeException("429 desde el proveedor")));
+        stubSaveEchoingWithId();
+
+        GenerarMaterialRequestDTO request = new GenerarMaterialRequestDTO(
+                Set.of(PiezaMaterial.TEORIA, PiezaMaterial.EVALUACION), ModeloIA.FLASH, null, null, null, null);
+
+        contenidoTemarioService.generarMaterial("temario-uuid-456", "profesor@katedra.com", request).get();
+
+        verify(planLimitService).reservarGeneraciones(mockUsuario, 2);
+        verify(planLimitService).liberarGeneraciones(mockUsuario, 1);
+    }
+
+    @Test
+    void shouldRefundEverythingWhenAllPiecesFail() throws Exception {
+        ContenidoTemario existing = contenidoConId(mockTemario);
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.of(existing));
+        given(aiContentGeneratorService.generarTeoria(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), anyInt()))
+                .willReturn(CompletableFuture.failedFuture(new RuntimeException("proveedor caído")));
+        stubSaveEchoingWithId();
+
+        GenerarMaterialRequestDTO request =
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.TEORIA), ModeloIA.FLASH, null, null, null, null);
+
+        contenidoTemarioService.generarMaterial("temario-uuid-456", "profesor@katedra.com", request).get();
+
+        verify(planLimitService).liberarGeneraciones(mockUsuario, 1);
+        // The lifetime metric only counts what was actually produced, so a total failure
+        // must not advance it either.
+        verify(usuarioRepository, never()).incrementAiGenerationCount(anyString(), anyLong());
+    }
+
+    @Test
+    void shouldNotConsumeQuotaWhenTheCapabilityGateRejects() {
+        ContenidoTemario existing = contenidoConId(mockTemario);
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.of(existing));
+        doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "El modelo Catedrático es exclusivo del plan Pro"))
+                .when(planLimitService).validarGeneracion(any(), any(), any());
+
+        GenerarMaterialRequestDTO request =
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.TEORIA), ModeloIA.PRO, null, null, null, null);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                contenidoTemarioService.generarMaterial("temario-uuid-456", "profesor@katedra.com", request));
+
+        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        verify(planLimitService, never()).reservarGeneraciones(any(), anyInt());
+        verify(aiContentGeneratorService, never())
+                .generarTeoria(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), anyInt());
+    }
+
+    @Test
+    void shouldNotCallTheAiProviderWhenTheQuotaIsExhausted() {
+        ContenidoTemario existing = contenidoConId(mockTemario);
+        given(temarioRepository.findById("temario-uuid-456")).willReturn(Optional.of(mockTemario));
+        given(contenidoTemarioRepository.findByTemarioId("temario-uuid-456")).willReturn(Optional.of(existing));
+        doThrow(new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Alcanzaste el límite diario"))
+                .when(planLimitService).reservarGeneraciones(any(), anyInt());
+
+        GenerarMaterialRequestDTO request =
+                new GenerarMaterialRequestDTO(Set.of(PiezaMaterial.TEORIA), ModeloIA.FLASH, null, null, null, null);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () ->
+                contenidoTemarioService.generarMaterial("temario-uuid-456", "profesor@katedra.com", request));
+
+        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        verify(aiContentGeneratorService, never())
+                .generarTeoria(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), anyInt());
     }
 }

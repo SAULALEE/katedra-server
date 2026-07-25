@@ -7,6 +7,7 @@ import Katedra.Server.dto.TemarioUrlRequestDTO;
 import Katedra.Server.dto.TemarioStatsResponseDTO;
 import Katedra.Server.model.Asignatura;
 import Katedra.Server.model.ContenidoTemario;
+import Katedra.Server.model.OrigenTemario;
 import Katedra.Server.model.Temario;
 import Katedra.Server.model.TipoEventoHistorial;
 import Katedra.Server.model.Usuario;
@@ -33,6 +34,7 @@ public class TemarioService {
     private final TemarioFileExtractionService temarioFileExtractionService;
     private final TemarioUrlExtractionService temarioUrlExtractionService;
     private final HistorialEventoService historialEventoService;
+    private final PlanLimitService planLimitService;
 
     public TemarioService(
             TemarioRepository temarioRepository,
@@ -41,7 +43,8 @@ public class TemarioService {
             ContenidoTemarioRepository contenidoTemarioRepository,
             TemarioFileExtractionService temarioFileExtractionService,
             TemarioUrlExtractionService temarioUrlExtractionService,
-            HistorialEventoService historialEventoService) {
+            HistorialEventoService historialEventoService,
+            PlanLimitService planLimitService) {
         this.temarioRepository = temarioRepository;
         this.asignaturaRepository = asignaturaRepository;
         this.usuarioRepository = usuarioRepository;
@@ -49,6 +52,7 @@ public class TemarioService {
         this.temarioFileExtractionService = temarioFileExtractionService;
         this.temarioUrlExtractionService = temarioUrlExtractionService;
         this.historialEventoService = historialEventoService;
+        this.planLimitService = planLimitService;
     }
 
     @Transactional
@@ -100,6 +104,10 @@ public class TemarioService {
         validateSingleGradoAcademico(gradoAcademico);
         Usuario usuario = usuarioRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        // Before any save and before the (expensive) extraction: this method persists the
+        // Temario and ContenidoTemario in its own transaction, so rejecting later would
+        // leave an orphan temario behind.
+        planLimitService.validarOrigenTemario(usuario, OrigenTemario.ARCHIVO);
         Asignatura asignatura = findOwnedAsignatura(asignaturaId, userEmail);
         var extracted = temarioFileExtractionService.extract(file);
         String resolvedTitulo = resolveTitulo(titulo, extracted.filename());
@@ -134,6 +142,9 @@ public class TemarioService {
         validateSingleGradoAcademico(request.gradoAcademico());
         Usuario usuario = usuarioRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        // Same reasoning as cargarTemarioArchivo: gate before any save, and before the
+        // outbound fetch — a FREE user should not be able to make the server scrape a URL.
+        planLimitService.validarOrigenTemario(usuario, OrigenTemario.URL);
         Asignatura asignatura = findOwnedAsignatura(request.asignaturaId(), userEmail);
         var extracted = temarioUrlExtractionService.extract(request.url());
         String resolvedTitulo = resolveTitulo(request.titulo(), extracted.title());

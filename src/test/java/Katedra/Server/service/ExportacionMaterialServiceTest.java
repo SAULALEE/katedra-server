@@ -14,6 +14,7 @@ import Katedra.Server.service.export.ExportadorMaterial;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -29,8 +30,11 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,6 +54,9 @@ class ExportacionMaterialServiceTest {
     @Mock
     private ExportadorMaterial exportadorPdf;
 
+    @Mock
+    private PlanLimitService planLimitService;
+
     private ExportacionMaterialService service;
     private ContenidoTemario contenido;
 
@@ -57,7 +64,8 @@ class ExportacionMaterialServiceTest {
     void setUp() throws IOException {
         given(exportadorPdf.formato()).willReturn(FormatoExportacion.PDF);
         given(exportadorPdf.exportar(any())).willReturn(BYTES);
-        service = new ExportacionMaterialService(guard, contenidoTemarioRepository, List.of(exportadorPdf));
+        service = new ExportacionMaterialService(
+                guard, contenidoTemarioRepository, planLimitService, List.of(exportadorPdf));
 
         Asignatura asignatura = new Asignatura(null, "Matemáticas", null);
 
@@ -175,5 +183,45 @@ class ExportacionMaterialServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode())
                 .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    // --- plan limits ---
+
+    @Test
+    void debeValidarElPlanSoloDespuesDeComprobarLaPropiedad() {
+        // Order matters for information disclosure: a plan-based 403 raised before the
+        // ownership check would tell a stranger that someone else's temario exists.
+        exportarPdfDeTeoria();
+
+        InOrder orden = inOrder(guard, planLimitService);
+        orden.verify(guard).findOwnedTemario(TEMARIO_ID, EMAIL);
+        orden.verify(planLimitService).validarExportacion(any(), eq(PiezaMaterial.TEORIA), eq(FormatoExportacion.PDF));
+        orden.verify(planLimitService).reservarExportacion(any());
+    }
+
+    @Test
+    void noDebeRenderizarCuandoElFormatoNoEstaEnElPlan() throws IOException {
+        willThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Exportar a PPTX es exclusivo del plan Pro"))
+                .given(planLimitService).validarExportacion(any(), any(), any());
+
+        assertThatThrownBy(this::exportarPdfDeTeoria)
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        verify(exportadorPdf, never()).exportar(any());
+    }
+
+    @Test
+    void noDebeRenderizarCuandoLaCuotaDiariaEstaAgotada() throws IOException {
+        willThrow(new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Alcanzaste el límite diario"))
+                .given(planLimitService).reservarExportacion(any());
+
+        assertThatThrownBy(this::exportarPdfDeTeoria)
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+
+        verify(exportadorPdf, never()).exportar(any());
     }
 }

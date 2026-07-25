@@ -5,6 +5,7 @@ import Katedra.Server.dto.TemarioResponseDTO;
 import Katedra.Server.dto.TemarioUrlRequestDTO;
 import Katedra.Server.model.Asignatura;
 import Katedra.Server.model.NivelAcademico;
+import Katedra.Server.model.OrigenTemario;
 import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.ContenidoTemario;
 import Katedra.Server.model.Temario;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -32,7 +34,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -59,6 +63,9 @@ class TemarioServiceTest {
 
     @Mock
     private HistorialEventoService historialEventoService;
+
+    @Mock
+    private PlanLimitService planLimitService;
 
     @InjectMocks
     private TemarioService temarioService;
@@ -454,6 +461,61 @@ class TemarioServiceTest {
         verify(contenidoTemarioRepository).save(argThat(contenido ->
                 "Contenido web limpio".equals(contenido.getTeoria())
                         && "Contenido web limpio".equals(contenido.getContenidoFuente())));
+    }
+
+    // --- plan limits on the ingestion sources ---
+
+    @Test
+    void shouldRejectFileUploadBeforePersistingAnything() {
+        // The rejection has to land before the first save. cargarTemarioArchivo commits the
+        // Temario and its ContenidoTemario in its own transaction, so gating any later
+        // would leave an orphan temario behind.
+        var file = new org.springframework.mock.web.MockMultipartFile(
+                "file", "temario.md", "text/markdown", "# Temario".getBytes());
+        given(usuarioRepository.findByEmail(mockUsuario.getEmail())).willReturn(Optional.of(mockUsuario));
+        doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "exclusivo del plan Pro"))
+                .when(planLimitService).validarOrigenTemario(mockUsuario, OrigenTemario.ARCHIVO);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> temarioService.cargarTemarioArchivo(
+                        mockUsuario.getEmail(), file, "Curso", "asignatura-1", "universitario"));
+
+        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        verify(temarioRepository, never()).save(any(Temario.class));
+        verify(contenidoTemarioRepository, never()).save(any(ContenidoTemario.class));
+        // Extraction is expensive; it must not run for a request that was never allowed.
+        verify(temarioFileExtractionService, never()).extract(any());
+    }
+
+    @Test
+    void shouldRejectUrlUploadBeforeFetchingTheUrl() {
+        // Also guards the server against being used as a fetcher by a free account.
+        var request = new TemarioUrlRequestDTO(
+                "https://ejemplo.com/temario", "Curso", "asignatura-1", "universitario");
+        given(usuarioRepository.findByEmail(mockUsuario.getEmail())).willReturn(Optional.of(mockUsuario));
+        doThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "exclusivo del plan Pro"))
+                .when(planLimitService).validarOrigenTemario(mockUsuario, OrigenTemario.URL);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> temarioService.cargarTemarioUrl(mockUsuario.getEmail(), request));
+
+        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        verify(temarioRepository, never()).save(any(Temario.class));
+        verify(temarioUrlExtractionService, never()).extract(any());
+    }
+
+    @Test
+    void shouldNotGateManualCreation() {
+        // Manual entry is the one path FREE keeps; it must never consult the origin gate
+        // for ARCHIVO or URL.
+        given(usuarioRepository.findByEmail(mockUsuario.getEmail())).willReturn(Optional.of(mockUsuario));
+        given(temarioRepository.save(any(Temario.class))).willReturn(mockTemario);
+
+        temarioService.createTemario(mockUsuario.getEmail(), new TemarioRequestDTO(
+                "Curso manual", "Descripción", "universitario", "asignatura-1"));
+
+        verify(planLimitService, never()).validarOrigenTemario(any(), eq(OrigenTemario.ARCHIVO));
+        verify(planLimitService, never()).validarOrigenTemario(any(), eq(OrigenTemario.URL));
     }
 
 }
