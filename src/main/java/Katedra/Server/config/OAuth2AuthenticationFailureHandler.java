@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 @Component
 public class OAuth2AuthenticationFailureHandler implements AuthenticationFailureHandler {
@@ -27,21 +28,13 @@ public class OAuth2AuthenticationFailureHandler implements AuthenticationFailure
             HttpServletResponse response,
             AuthenticationException exception
     ) throws IOException, ServletException {
-        logger.error("""
-                ================ GOOGLE OAUTH ERROR ================
-                Clase: {}
-                Mensaje: {}
-                Causa: {}
-                ====================================================
-                """,
-                exception.getClass().getName(),
-                exception.getMessage(),
-                exception.getCause() != null ? exception.getCause().toString() : "null");
-        logger.error("Google OAuth stack trace", exception);
+        logger.error("OAuth authentication failed: {}", exception.getClass().getSimpleName());
 
         String redirectUrl = UriComponentsBuilder.fromUriString(frontendErrorUrl)
                 .queryParam("error", "social_auth_failed")
+                .queryParam("message", "No se pudo completar el inicio de sesión social.")
                 .build()
+                .encode(StandardCharsets.UTF_8)
                 .toUriString();
 
         response.sendRedirect(redirectUrl);

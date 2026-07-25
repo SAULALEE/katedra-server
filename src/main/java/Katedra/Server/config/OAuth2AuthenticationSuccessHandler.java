@@ -1,6 +1,7 @@
 package Katedra.Server.config;
 
 import Katedra.Server.dto.AuthResponseDTO;
+import Katedra.Server.exception.SocialAccountConflictException;
 import Katedra.Server.model.AuthProvider;
 import Katedra.Server.service.AuthService;
 import jakarta.servlet.ServletException;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 @Component
 public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccessHandler {
@@ -56,26 +58,22 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
                     .toUriString();
 
             response.sendRedirect(redirectUrl);
+        } catch (SocialAccountConflictException exception) {
+            redirectToError(response, exception.getErrorCode(), exception.getMessage());
         } catch (Exception exception) {
-            logger.error("""
-                    ================ GOOGLE OAUTH ERROR ================
-                    Clase: {}
-                    Mensaje: {}
-                    Causa: {}
-                    ====================================================
-                    """,
-                    exception.getClass().getName(),
-                    exception.getMessage(),
-                    exception.getCause() != null ? exception.getCause().toString() : "null");
-            logger.error("Google OAuth stack trace", exception);
-
-            String redirectUrl = UriComponentsBuilder.fromUriString(frontendErrorUrl)
-                    .queryParam("error", "social_auth_failed")
-                    .build()
-                    .toUriString();
-
-            response.sendRedirect(redirectUrl);
+            logger.error("OAuth completion failed: {}", exception.getClass().getSimpleName());
+            redirectToError(response, "social_auth_failed", "No se pudo completar el inicio de sesión social.");
         }
+    }
+
+    private void redirectToError(HttpServletResponse response, String errorCode, String message) throws IOException {
+        String redirectUrl = UriComponentsBuilder.fromUriString(frontendErrorUrl)
+                .queryParam("error", errorCode)
+                .queryParam("message", message)
+                .build()
+                .encode(StandardCharsets.UTF_8)
+                .toUriString();
+        response.sendRedirect(redirectUrl);
     }
 
     private AuthProvider resolveProvider(String registrationId) {

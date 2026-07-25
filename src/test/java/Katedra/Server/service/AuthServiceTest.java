@@ -3,6 +3,8 @@ package Katedra.Server.service;
 import Katedra.Server.dto.AuthLoginRequestDTO;
 import Katedra.Server.dto.AuthRegisterRequestDTO;
 import Katedra.Server.dto.AuthResponseDTO;
+import Katedra.Server.exception.SocialAccountConflictException;
+import Katedra.Server.model.AuthProvider;
 import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.UsuarioRepository;
@@ -114,5 +116,63 @@ class AuthServiceTest {
 
         assertThat(exception.getMessage()).isEqualTo("Usuario no encontrado");
         verify(authenticationManager, never()).authenticate(any(UsernamePasswordAuthenticationToken.class));
+    }
+
+    @Test
+    void shouldCreateGoogleUserAsProfesor() {
+        given(usuarioRepository.findByAuthProviderAndProviderUserId(AuthProvider.GOOGLE, "google-123"))
+                .willReturn(Optional.empty());
+        given(usuarioRepository.findByEmail("teacher@katedra.com")).willReturn(Optional.empty());
+        given(usuarioRepository.save(any(Usuario.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(jwtService.generateToken(any(Usuario.class))).willReturn("google_jwt");
+
+        AuthResponseDTO response = authService.loginOrRegisterSocial(
+                AuthProvider.GOOGLE, "google-123", "teacher@katedra.com", "Teacher");
+
+        ArgumentCaptor<Usuario> captor = ArgumentCaptor.forClass(Usuario.class);
+        verify(usuarioRepository).save(captor.capture());
+        assertThat(captor.getValue().getAuthProvider()).isEqualTo(AuthProvider.GOOGLE);
+        assertThat(captor.getValue().getProviderUserId()).isEqualTo("google-123");
+        assertThat(captor.getValue().getRol()).isEqualTo(RolUsuario.ROLE_PROFESOR);
+        assertThat(response.token()).isEqualTo("google_jwt");
+    }
+
+    @Test
+    void shouldLoginExistingGoogleUserWithoutCreatingDuplicate() {
+        Usuario googleUser = new Usuario();
+        googleUser.setEmail("teacher@example.com");
+        googleUser.setNombre("Teacher");
+        googleUser.setAuthProvider(AuthProvider.GOOGLE);
+        googleUser.setProviderUserId("google-123");
+        googleUser.setRol(RolUsuario.ROLE_PROFESOR);
+        given(usuarioRepository.findByAuthProviderAndProviderUserId(AuthProvider.GOOGLE, "google-123"))
+                .willReturn(Optional.of(googleUser));
+        given(jwtService.generateToken(googleUser)).willReturn("google_jwt");
+
+        AuthResponseDTO response = authService.loginOrRegisterSocial(
+                AuthProvider.GOOGLE, "google-123", "teacher@example.com", "Teacher");
+
+        assertThat(response.token()).isEqualTo("google_jwt");
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+        verify(usuarioRepository, never()).findByEmail(any());
+    }
+
+    @Test
+    void shouldRejectGoogleLoginWhenEmailBelongsToLocalAccount() {
+        Usuario localUser = new Usuario(
+                "teacher@example.com", "encoded-password", "Teacher", RolUsuario.ROLE_PROFESOR);
+        given(usuarioRepository.findByAuthProviderAndProviderUserId(AuthProvider.GOOGLE, "google-123"))
+                .willReturn(Optional.empty());
+        given(usuarioRepository.findByEmail("teacher@example.com")).willReturn(Optional.of(localUser));
+
+        SocialAccountConflictException exception = assertThrows(
+                SocialAccountConflictException.class,
+                () -> authService.loginOrRegisterSocial(
+                        AuthProvider.GOOGLE, "google-123", "teacher@example.com", "Teacher"));
+
+        assertThat(exception.getErrorCode()).isEqualTo("local_account_exists");
+        assertThat(exception.getMessage()).contains("contraseña");
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+        verify(jwtService, never()).generateToken(any(Usuario.class));
     }
 }
