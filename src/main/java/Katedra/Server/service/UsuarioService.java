@@ -147,6 +147,7 @@ public class UsuarioService {
                 usuario.getEmail(),
                 usuario.getNombre(),
                 usuario.getRol(),
+                usuario.getPlan(),
                 usuario.getCreatedAt()
         );
     }
