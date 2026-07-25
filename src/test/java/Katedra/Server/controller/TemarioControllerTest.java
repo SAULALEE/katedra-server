@@ -54,6 +54,9 @@ class TemarioControllerTest {
     private ContenidoTemarioService contenidoTemarioService;
 
     @MockitoBean
+    private Katedra.Server.service.HistorialEventoService historialEventoService;
+
+    @MockitoBean
     private Katedra.Server.service.JwtService jwtService;
 
     @MockitoBean
@@ -549,6 +552,22 @@ class TemarioControllerTest {
         mockMvc.perform(get("/temarios/estadisticas").principal(mockPrincipal))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.llamadasIA").value(7));
+    }
+
+    @Test
+    void shouldGetHistorial() throws Exception {
+        var evento = new Katedra.Server.dto.HistorialEventoResponseDTO(
+                "evento-uuid-1", "temario-uuid-123", "Curso de Spring Boot", "Programación",
+                Katedra.Server.model.TipoEventoHistorial.CREADO, null, LocalDateTime.now());
+        given(historialEventoService.listarHistorial("profesor@katedra.com"))
+                .willReturn(List.of(evento));
+
+        mockMvc.perform(get("/temarios/historial").principal(mockPrincipal))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value("evento-uuid-1"))
+                .andExpect(jsonPath("$[0].tipo").value("CREADO"));
+
+        verify(historialEventoService).listarHistorial("profesor@katedra.com");
     }
 
     @Test

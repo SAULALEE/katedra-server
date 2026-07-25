@@ -29,6 +29,8 @@
 	<properties>
 		<java.version>21</java.version>
 		<spring-ai.version>2.0.0</spring-ai.version>
+		<poi.version>5.4.1</poi.version>
+		<commonmark.version>0.24.0</commonmark.version>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
@@ -50,6 +52,28 @@
 			<groupId>org.apache.pdfbox</groupId>
 			<artifactId>pdfbox</artifactId>
 			<version>3.0.5</version>
+		</dependency>
+		<!-- Apache POI: DOCX (XWPF) and PPTX (XSLF) generation for material exports.
+		     Already reachable transitively through tika-parsers-standard-package, but a
+		     transitive dependency is not an API contract: declare it explicitly, pinned to
+		     the same version Tika resolves so both stay in sync. -->
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>${poi.version}</version>
+		</dependency>
+		<!-- commonmark: parses the AI's markdown into an AST that the PDF and DOCX exporters
+		     walk. Chosen over an HTML->PDF pipeline because openhtmltopdf pins PDFBox 2.x,
+		     which would clash with the PDFBox 3.0.5 already in use. -->
+		<dependency>
+			<groupId>org.commonmark</groupId>
+			<artifactId>commonmark</artifactId>
+			<version>${commonmark.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.commonmark</groupId>
+			<artifactId>commonmark-ext-gfm-tables</artifactId>
+			<version>${commonmark.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.tika</groupId>
