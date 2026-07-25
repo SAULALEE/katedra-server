@@ -3,6 +3,7 @@ package Katedra.Server.service;
 import Katedra.Server.dto.AuthLoginRequestDTO;
 import Katedra.Server.dto.AuthRegisterRequestDTO;
 import Katedra.Server.dto.AuthResponseDTO;
+import Katedra.Server.dto.PasswordChangeRequestDTO;
 import Katedra.Server.exception.SocialAccountConflictException;
 import Katedra.Server.model.AuthProvider;
 import Katedra.Server.model.RolUsuario;
@@ -17,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 
@@ -104,17 +106,18 @@ class AuthServiceTest {
     }
 
     @Test
-    void shouldThrowExceptionWhenLoginUserNotFound() {
+    void shouldReturnUnauthorizedWhenLoginUserNotFound() {
         // Arrange
         AuthLoginRequestDTO request = new AuthLoginRequestDTO("notfound@cueva.com", "fuego123");
         given(usuarioRepository.findByEmail(request.email())).willReturn(Optional.empty());
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
             authService.login(request);
         });
 
-        assertThat(exception.getMessage()).isEqualTo("Usuario no encontrado");
+        assertThat(exception.getStatusCode().value()).isEqualTo(401);
+        assertThat(exception.getReason()).isEqualTo("Email o contraseña incorrectos");
         verify(authenticationManager, never()).authenticate(any(UsernamePasswordAuthenticationToken.class));
     }
 
@@ -174,5 +177,82 @@ class AuthServiceTest {
         assertThat(exception.getMessage()).contains("contraseña");
         verify(usuarioRepository, never()).save(any(Usuario.class));
         verify(jwtService, never()).generateToken(any(Usuario.class));
+    }
+
+    @Test
+    void shouldReturnUnauthorizedWhenLoginPasswordIsIncorrect() {
+        // Arrange
+        AuthLoginRequestDTO request = new AuthLoginRequestDTO("test@cueva.com", "wrongpass");
+        Usuario usuario = new Usuario("test@cueva.com", "encoded_fuego123", "Grog", RolUsuario.ROLE_PROFESOR);
+
+        given(usuarioRepository.findByEmail(request.email())).willReturn(Optional.of(usuario));
+        given(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .willThrow(new org.springframework.security.authentication.BadCredentialsException("bad creds"));
+
+        // Act & Assert
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
+            authService.login(request);
+        });
+
+        assertThat(exception.getStatusCode().value()).isEqualTo(401);
+        assertThat(exception.getReason()).isEqualTo("Email o contraseña incorrectos");
+    }
+
+    @Test
+    void shouldChangePasswordAndClearMustChangeFlag() {
+        // Arrange
+        Usuario usuario = new Usuario("admin@katedra.com", "encoded_temp", "Admin", RolUsuario.ROLE_ADMIN);
+        usuario.setMustChangePassword(true);
+        PasswordChangeRequestDTO request = new PasswordChangeRequestDTO("temp123!", "miNuevaClave123");
+
+        given(usuarioRepository.findByEmail("admin@katedra.com")).willReturn(Optional.of(usuario));
+        given(passwordEncoder.matches("temp123!", "encoded_temp")).willReturn(true);
+        given(passwordEncoder.encode("miNuevaClave123")).willReturn("encoded_new");
+        given(jwtService.generateToken(usuario)).willReturn("mocked_jwt_token");
+
+        // Act
+        AuthResponseDTO response = authService.changePassword("admin@katedra.com", request);
+
+        // Assert
+        assertThat(response.token()).isEqualTo("mocked_jwt_token");
+        assertThat(response.mustChangePassword()).isFalse();
+        assertThat(usuario.getPassword()).isEqualTo("encoded_new");
+        assertThat(usuario.isMustChangePassword()).isFalse();
+        verify(usuarioRepository).save(usuario);
+    }
+
+    @Test
+    void shouldThrowExceptionWhenCurrentPasswordIsIncorrect() {
+        // Arrange
+        Usuario usuario = new Usuario("admin@katedra.com", "encoded_temp", "Admin", RolUsuario.ROLE_ADMIN);
+        PasswordChangeRequestDTO request = new PasswordChangeRequestDTO("wrong", "miNuevaClave123");
+
+        given(usuarioRepository.findByEmail("admin@katedra.com")).willReturn(Optional.of(usuario));
+        given(passwordEncoder.matches("wrong", "encoded_temp")).willReturn(false);
+
+        // Act & Assert
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> authService.changePassword("admin@katedra.com", request));
+
+        assertThat(exception.getReason()).isEqualTo("La contraseña actual es incorrecta");
+        assertThat(usuario.isMustChangePassword()).isFalse();
+    }
+
+    @Test
+    void shouldThrowExceptionWhenChangingPasswordForSocialAccount() {
+        // Arrange
+        Usuario usuario = new Usuario();
+        usuario.setEmail("social@katedra.com");
+        usuario.setPassword(null);
+        usuario.setAuthProvider(AuthProvider.GOOGLE);
+        PasswordChangeRequestDTO request = new PasswordChangeRequestDTO("whatever", "miNuevaClave123");
+
+        given(usuarioRepository.findByEmail("social@katedra.com")).willReturn(Optional.of(usuario));
+
+        // Act & Assert
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> authService.changePassword("social@katedra.com", request));
+
+        assertThat(exception.getReason()).isEqualTo("Esta cuenta usa login social");
     }
 }

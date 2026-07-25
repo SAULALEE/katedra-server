@@ -61,11 +61,13 @@ public class WebSecurityConfig {
                 .requestMatchers("/auth/**", "/api/v1/auth/**").permitAll()
                 .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                 .requestMatchers("/error").permitAll()
+                // Any authenticated user can change their own password
+                .requestMatchers(HttpMethod.POST, "/usuarios/me/password", "/api/v1/usuarios/me/password").authenticated()
                 // ROLE_ADMIN: user management only
-                .requestMatchers("/usuarios/**").hasRole("ADMIN")
+                .requestMatchers("/usuarios/**", "/api/v1/usuarios/**").hasRole("ADMIN")
                 // ROLE_PROFESOR: academic features only
-                .requestMatchers("/asignaturas/**").hasRole("PROFESOR")
-                .requestMatchers("/temarios/**").hasRole("PROFESOR")
+                .requestMatchers("/asignaturas/**", "/api/v1/asignaturas/**").hasRole("PROFESOR")
+                .requestMatchers("/temarios/**", "/api/v1/temarios/**").hasRole("PROFESOR")
                 // Deny everything else
                 .anyRequest().denyAll()
             )
@@ -75,7 +77,7 @@ public class WebSecurityConfig {
                 .authenticationEntryPoint((request, response, authException) ->
                         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED))
             )
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authenticationProvider(authenticationProvider)
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

@@ -37,7 +37,8 @@ class OAuth2AuthenticationSuccessHandlerTest {
                 AuthProvider.GOOGLE, "google-123", "teacher@example.com", "Teacher"))
                 .willReturn(new AuthResponseDTO(
                         "header.payload.signature",
-                        new UsuarioDTO("user-1", "teacher@example.com", "Teacher", RolUsuario.ROLE_PROFESOR)));
+                        new UsuarioDTO("user-1", "teacher@example.com", "Teacher", RolUsuario.ROLE_PROFESOR),
+                        false));
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         handler.onAuthenticationSuccess(new MockHttpServletRequest(), response, authentication);
