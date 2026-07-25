@@ -11,6 +11,7 @@ import Katedra.Server.model.NivelAcademico;
 import Katedra.Server.model.PiezaMaterial;
 import Katedra.Server.model.Temario;
 import Katedra.Server.model.TipoEventoHistorial;
+import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.ContenidoTemarioRepository;
 import Katedra.Server.repository.TemarioRepository;
 import Katedra.Server.repository.UsuarioRepository;
@@ -38,18 +39,21 @@ public class ContenidoTemarioService {
     private final AiContentGeneratorService aiContentGeneratorService;
     private final UsuarioRepository usuarioRepository;
     private final HistorialEventoService historialEventoService;
+    private final PlanLimitService planLimitService;
 
     public ContenidoTemarioService(
             ContenidoTemarioRepository contenidoTemarioRepository,
             TemarioRepository temarioRepository,
             AiContentGeneratorService aiContentGeneratorService,
             UsuarioRepository usuarioRepository,
-            HistorialEventoService historialEventoService) {
+            HistorialEventoService historialEventoService,
+            PlanLimitService planLimitService) {
         this.contenidoTemarioRepository = contenidoTemarioRepository;
         this.temarioRepository = temarioRepository;
         this.aiContentGeneratorService = aiContentGeneratorService;
         this.usuarioRepository = usuarioRepository;
         this.historialEventoService = historialEventoService;
+        this.planLimitService = planLimitService;
     }
 
     @Transactional
@@ -116,6 +120,13 @@ public class ContenidoTemarioService {
                         : temario.getDescripcion();
 
         Set<PiezaMaterial> piezas = request.piezas();
+
+        // Capability gate before the teoría prerequisite below: a FREE user asking for
+        // diapositivas should be told it is a Pro feature, not "generate teoría first"
+        // for something they could never generate anyway.
+        Usuario usuario = temario.getUsuario();
+        planLimitService.validarGeneracion(usuario, modeloTier, piezas);
+
         boolean generaTeoriaAhora = piezas.contains(PiezaMaterial.TEORIA);
         boolean requiereTeoriaExistente = piezas.contains(PiezaMaterial.EVALUACION)
                 || piezas.contains(PiezaMaterial.DIAPOSITIVAS);
@@ -125,6 +136,12 @@ public class ContenidoTemarioService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Genera la teoría primero antes de generar evaluación o diapositivas");
         }
+
+        // Last validation before any AI call, and deliberately so: a request rejected for
+        // any other reason must not cost the user quota. Synchronous on purpose — doing
+        // this inside the async completion stage below would gate nothing, since
+        // concurrent requests would all check a counter none of them had written yet.
+        planLimitService.reservarGeneraciones(usuario, piezas.size());
 
         // Evaluación/diapositivas are grounded in the theory text, never the raw syllabus
         // source: if teoría is part of this same request it must finish first so its
@@ -181,6 +198,14 @@ public class ContenidoTemarioService {
                                 resultados.values().stream().filter(future -> future.join() != null).count());
                         historialEventoService.registrar(temario, TipoEventoHistorial.GENERADO,
                                 String.join(", ", piezasExitosas) + " · " + modeloTier.getValor().toUpperCase());
+                    }
+
+                    // Refund the pieces the provider failed to deliver. Quota was reserved
+                    // up front for all of them, and an OpenAI outage should not silently
+                    // cost the user their day.
+                    int fallidas = piezas.size() - piezasExitosas.size();
+                    if (fallidas > 0) {
+                        planLimitService.liberarGeneraciones(usuario, fallidas);
                     }
                     ContenidoTemario saved = contenidoTemarioRepository.save(contenido);
                     return mapToDTO(saved, fallos);
