@@ -185,6 +185,76 @@ paths:
         '404':
           description: Temario no encontrado
 
+  /temarios/{temarioId}/exportaciones:
+    get:
+      summary: Descargar una pieza del material generado como archivo
+      description: >
+        Devuelve la pieza indicada en el formato solicitado, con encabezado (materia y temario) y
+        el pie "© Katedra, 2026" en todas las páginas. El PDF se entrega cifrado sin permiso de
+        modificación y el DOCX con protección de sólo lectura.
+        Combinaciones válidas: teoria → docx|pdf|md · evaluacion → docx|pdf|md|gs · diapositivas → pptx|pdf.
+      security:
+        - BearerAuth: []
+      tags:
+        - Contenido y Materiales
+      parameters:
+        - name: temarioId
+          in: path
+          required: true
+          description: ID único (UUID) del temario
+          schema:
+            type: string
+            format: uuid
+        - name: pieza
+          in: query
+          required: true
+          description: Pieza de material a exportar
+          schema:
+            type: string
+            enum: [teoria, evaluacion, diapositivas]
+        - name: formato
+          in: query
+          required: true
+          description: Formato del archivo. `gs` genera un script de Google Apps Script que crea el formulario.
+          schema:
+            type: string
+            enum: [docx, pdf, md, pptx, gs]
+      responses:
+        '200':
+          description: Archivo generado
+          headers:
+            Content-Disposition:
+              description: attachment con el nombre de archivo (materia-temario-pieza.ext)
+              schema:
+                type: string
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.presentationml.presentation:
+              schema:
+                type: string
+                format: binary
+            text/markdown:
+              schema:
+                type: string
+            text/javascript:
+              schema:
+                type: string
+        '400':
+          description: Pieza o formato no válido, o combinación no soportada
+        '401':
+          description: No autorizado
+        '403':
+          description: El temario pertenece a otro usuario
+        '404':
+          description: Temario no encontrado o pieza sin material generado
+
   /temarios/{id}/generar-material:
     post:
       summary: Forzar la generación/actualización del material didáctico para un temario existente

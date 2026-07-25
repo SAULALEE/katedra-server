@@ -8,6 +8,7 @@ import Katedra.Server.dto.TemarioStatsResponseDTO;
 import Katedra.Server.model.Asignatura;
 import Katedra.Server.model.ContenidoTemario;
 import Katedra.Server.model.Temario;
+import Katedra.Server.model.TipoEventoHistorial;
 import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.AsignaturaRepository;
 import Katedra.Server.repository.ContenidoTemarioRepository;
@@ -31,6 +32,7 @@ public class TemarioService {
     private final ContenidoTemarioRepository contenidoTemarioRepository;
     private final TemarioFileExtractionService temarioFileExtractionService;
     private final TemarioUrlExtractionService temarioUrlExtractionService;
+    private final HistorialEventoService historialEventoService;
 
     public TemarioService(
             TemarioRepository temarioRepository,
@@ -38,13 +40,15 @@ public class TemarioService {
             UsuarioRepository usuarioRepository,
             ContenidoTemarioRepository contenidoTemarioRepository,
             TemarioFileExtractionService temarioFileExtractionService,
-            TemarioUrlExtractionService temarioUrlExtractionService) {
+            TemarioUrlExtractionService temarioUrlExtractionService,
+            HistorialEventoService historialEventoService) {
         this.temarioRepository = temarioRepository;
         this.asignaturaRepository = asignaturaRepository;
         this.usuarioRepository = usuarioRepository;
         this.contenidoTemarioRepository = contenidoTemarioRepository;
         this.temarioFileExtractionService = temarioFileExtractionService;
         this.temarioUrlExtractionService = temarioUrlExtractionService;
+        this.historialEventoService = historialEventoService;
     }
 
     @Transactional
@@ -63,6 +67,7 @@ public class TemarioService {
 
         Temario saved = temarioRepository.save(temario);
         contenidoTemarioRepository.save(new ContenidoTemario(saved));
+        historialEventoService.registrar(saved, TipoEventoHistorial.CREADO, null);
         return mapToDTO(saved);
     }
 
@@ -80,7 +85,9 @@ public class TemarioService {
         temario.setGradoAcademico(request.gradoAcademico());
         temario.setAsignatura(findOwnedAsignatura(request.asignaturaId(), userEmail));
         temario.setUpdatedAt(java.time.LocalDateTime.now());
-        return mapToDTO(temarioRepository.save(temario));
+        Temario saved = temarioRepository.save(temario);
+        historialEventoService.registrar(saved, TipoEventoHistorial.EDITADO, null);
+        return mapToDTO(saved);
     }
 
     @Transactional
@@ -110,6 +117,7 @@ public class TemarioService {
         contenido.setTeoria(extracted.text());
         contenido.setContenidoFuente(extracted.text());
         ContenidoTemario savedContenido = contenidoTemarioRepository.save(contenido);
+        historialEventoService.registrar(savedTemario, TipoEventoHistorial.CREADO, null);
 
         return new TemarioUploadResponseDTO(
                 mapToDTO(savedTemario),
@@ -143,6 +151,7 @@ public class TemarioService {
         contenido.setTeoria(extracted.text());
         contenido.setContenidoFuente(extracted.text());
         ContenidoTemario savedContenido = contenidoTemarioRepository.save(contenido);
+        historialEventoService.registrar(savedTemario, TipoEventoHistorial.CREADO, null);
 
         return new TemarioUploadResponseDTO(
                 mapToDTO(savedTemario),
@@ -206,7 +215,10 @@ public class TemarioService {
         }
         temario.setFavorito(favorito);
         temario.setUpdatedAt(java.time.LocalDateTime.now());
-        return mapToDTO(temarioRepository.save(temario));
+        Temario saved = temarioRepository.save(temario);
+        historialEventoService.registrar(saved,
+                favorito ? TipoEventoHistorial.FAVORITO_AGREGADO : TipoEventoHistorial.FAVORITO_QUITADO, null);
+        return mapToDTO(saved);
     }
 
     @Transactional
@@ -220,6 +232,7 @@ public class TemarioService {
 
         contenidoTemarioRepository.findByTemarioId(id).ifPresent(contenidoTemarioRepository::delete);
         temarioRepository.delete(temario);
+        historialEventoService.registrar(temario, TipoEventoHistorial.ELIMINADO, null);
     }
 
     @Transactional(readOnly = true)

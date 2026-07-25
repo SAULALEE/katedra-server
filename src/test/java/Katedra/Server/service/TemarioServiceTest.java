@@ -8,6 +8,7 @@ import Katedra.Server.model.NivelAcademico;
 import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.ContenidoTemario;
 import Katedra.Server.model.Temario;
+import Katedra.Server.model.TipoEventoHistorial;
 import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.AsignaturaRepository;
 import Katedra.Server.repository.ContenidoTemarioRepository;
@@ -55,6 +56,9 @@ class TemarioServiceTest {
 
     @Mock
     private TemarioUrlExtractionService temarioUrlExtractionService;
+
+    @Mock
+    private HistorialEventoService historialEventoService;
 
     @InjectMocks
     private TemarioService temarioService;
@@ -111,6 +115,7 @@ class TemarioServiceTest {
         verify(usuarioRepository).findByEmail(mockUsuario.getEmail());
         verify(temarioRepository).save(any(Temario.class));
         verify(contenidoTemarioRepository).save(argThat(contenido -> contenido.getTemario() == mockTemario));
+        verify(historialEventoService).registrar(mockTemario, TipoEventoHistorial.CREADO, null);
     }
 
     @Test
@@ -147,6 +152,7 @@ class TemarioServiceTest {
         assertThat(response.gradoAcademico()).isEqualTo("Posgrado");
         assertThat(response.asignatura()).isEqualTo("Programacion");
         verify(temarioRepository).save(mockTemario);
+        verify(historialEventoService).registrar(mockTemario, TipoEventoHistorial.EDITADO, null);
     }
 
     @Test
@@ -214,6 +220,7 @@ class TemarioServiceTest {
         assertThat(response.favorito()).isTrue();
         assertThat(mockTemario.isFavorito()).isTrue();
         verify(temarioRepository).save(mockTemario);
+        verify(historialEventoService).registrar(mockTemario, TipoEventoHistorial.FAVORITO_AGREGADO, null);
     }
 
     @Test
@@ -227,6 +234,7 @@ class TemarioServiceTest {
 
         assertThat(response.favorito()).isFalse();
         assertThat(mockTemario.isFavorito()).isFalse();
+        verify(historialEventoService).registrar(mockTemario, TipoEventoHistorial.FAVORITO_QUITADO, null);
     }
 
     @Test
@@ -317,6 +325,7 @@ class TemarioServiceTest {
         verify(temarioRepository).findById(mockTemario.getId());
         verify(contenidoTemarioRepository).delete(contenido);
         verify(temarioRepository).delete(mockTemario);
+        verify(historialEventoService).registrar(mockTemario, TipoEventoHistorial.ELIMINADO, null);
     }
 
     @Test

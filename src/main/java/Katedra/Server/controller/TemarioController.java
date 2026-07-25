@@ -31,10 +31,15 @@ public class TemarioController {
 
     private final TemarioService temarioService;
     private final Katedra.Server.service.ContenidoTemarioService contenidoTemarioService;
+    private final Katedra.Server.service.HistorialEventoService historialEventoService;
 
-    public TemarioController(TemarioService temarioService, Katedra.Server.service.ContenidoTemarioService contenidoTemarioService) {
+    public TemarioController(
+            TemarioService temarioService,
+            Katedra.Server.service.ContenidoTemarioService contenidoTemarioService,
+            Katedra.Server.service.HistorialEventoService historialEventoService) {
         this.temarioService = temarioService;
         this.contenidoTemarioService = contenidoTemarioService;
+        this.historialEventoService = historialEventoService;
     }
 
     /**
@@ -126,6 +131,19 @@ public class TemarioController {
     @GetMapping("/estadisticas")
     public ResponseEntity<Katedra.Server.dto.TemarioStatsResponseDTO> getEstadisticas(Authentication authentication) {
         return ResponseEntity.ok(temarioService.getEstadisticas(authentication.getName()));
+    }
+
+    /**
+     * Returns the authenticated user's read-only content history: temarios created, edited,
+     * (un)favorited, had material generated, or deleted, newest first. Nothing here can be
+     * removed by the caller — it is an audit trail, not a browsable/editable log.
+     *
+     * @param authentication the authenticated user token
+     * @return the user's history events, newest first
+     */
+    @GetMapping("/historial")
+    public ResponseEntity<List<Katedra.Server.dto.HistorialEventoResponseDTO>> getHistorial(Authentication authentication) {
+        return ResponseEntity.ok(historialEventoService.listarHistorial(authentication.getName()));
     }
 
     /**

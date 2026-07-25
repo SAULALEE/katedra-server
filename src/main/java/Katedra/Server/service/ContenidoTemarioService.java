@@ -10,6 +10,7 @@ import Katedra.Server.model.ModeloIA;
 import Katedra.Server.model.NivelAcademico;
 import Katedra.Server.model.PiezaMaterial;
 import Katedra.Server.model.Temario;
+import Katedra.Server.model.TipoEventoHistorial;
 import Katedra.Server.repository.ContenidoTemarioRepository;
 import Katedra.Server.repository.TemarioRepository;
 import Katedra.Server.repository.UsuarioRepository;
@@ -36,16 +37,19 @@ public class ContenidoTemarioService {
     private final TemarioRepository temarioRepository;
     private final AiContentGeneratorService aiContentGeneratorService;
     private final UsuarioRepository usuarioRepository;
+    private final HistorialEventoService historialEventoService;
 
     public ContenidoTemarioService(
             ContenidoTemarioRepository contenidoTemarioRepository,
             TemarioRepository temarioRepository,
             AiContentGeneratorService aiContentGeneratorService,
-            UsuarioRepository usuarioRepository) {
+            UsuarioRepository usuarioRepository,
+            HistorialEventoService historialEventoService) {
         this.contenidoTemarioRepository = contenidoTemarioRepository;
         this.temarioRepository = temarioRepository;
         this.aiContentGeneratorService = aiContentGeneratorService;
         this.usuarioRepository = usuarioRepository;
+        this.historialEventoService = historialEventoService;
     }
 
     @Transactional
@@ -157,11 +161,13 @@ public class ContenidoTemarioService {
         return CompletableFuture.allOf(resultados.values().toArray(CompletableFuture[]::new))
                 .thenApply(v -> {
                     boolean algunExito = false;
+                    List<String> piezasExitosas = new java.util.ArrayList<>();
                     for (Map.Entry<PiezaMaterial, CompletableFuture<Object>> entry : resultados.entrySet()) {
                         Object resultado = entry.getValue().join();
                         if (resultado != null) {
                             aplicarResultado(contenido, entry.getKey(), resultado);
                             algunExito = true;
+                            piezasExitosas.add(entry.getKey().getValor());
                         }
                     }
 
@@ -173,6 +179,8 @@ public class ContenidoTemarioService {
                         usuarioRepository.incrementAiGenerationCount(
                                 temario.getUsuario().getId(),
                                 resultados.values().stream().filter(future -> future.join() != null).count());
+                        historialEventoService.registrar(temario, TipoEventoHistorial.GENERADO,
+                                String.join(", ", piezasExitosas) + " · " + modeloTier.getValor().toUpperCase());
                     }
                     ContenidoTemario saved = contenidoTemarioRepository.save(contenido);
                     return mapToDTO(saved, fallos);

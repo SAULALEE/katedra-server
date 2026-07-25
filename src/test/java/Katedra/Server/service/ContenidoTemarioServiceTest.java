@@ -57,6 +57,9 @@ class ContenidoTemarioServiceTest {
     @Mock
     private AiContentGeneratorService aiContentGeneratorService;
 
+    @Mock
+    private HistorialEventoService historialEventoService;
+
     @InjectMocks
     private ContenidoTemarioService contenidoTemarioService;
 
@@ -268,6 +271,8 @@ class ContenidoTemarioServiceTest {
         assertThat(response.diapositivas()).isNull();
         assertThat(response.modelo()).isEqualTo("flash");
         verify(usuarioRepository).incrementAiGenerationCount(mockUsuario.getId(), 1L);
+        verify(historialEventoService).registrar(
+                eq(mockTemario), eq(Katedra.Server.model.TipoEventoHistorial.GENERADO), anyString());
 
         verify(aiContentGeneratorService, never())
                 .generarTeoria(anyString(), anyString(), any(NivelAcademico.class), anyString(), any(ModeloIA.class), anyInt());
