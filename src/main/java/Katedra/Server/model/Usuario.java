@@ -48,6 +48,9 @@ public class Usuario {
     @Column(name = "ai_generation_count", nullable = false)
     private long aiGenerationCount;
 
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword = false;
+
     public Usuario() {}
 
     public Usuario(String email, String password, String nombre, RolUsuario rol) {
@@ -78,4 +81,6 @@ public class Usuario {
     public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
     public long getAiGenerationCount() { return aiGenerationCount; }
     public void setAiGenerationCount(long aiGenerationCount) { this.aiGenerationCount = aiGenerationCount; }
+    public boolean isMustChangePassword() { return mustChangePassword; }
+    public void setMustChangePassword(boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
 }

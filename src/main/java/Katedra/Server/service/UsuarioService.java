@@ -1,30 +1,83 @@
 package Katedra.Server.service;
 
+import Katedra.Server.dto.UsuarioCreateRequestDTO;
+import Katedra.Server.dto.UsuarioCreateResponseDTO;
 import Katedra.Server.dto.UsuarioDTO;
 import Katedra.Server.dto.UsuarioUpdateRequestDTO;
 import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.UsuarioRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 public class UsuarioService {
 
-    private final UsuarioRepository usuarioRepository;
+    private static final String PASSWORD_CHARS =
+            "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%";
+    private static final int TEMPORARY_PASSWORD_LENGTH = 14;
+    private static final SecureRandom RANDOM = new SecureRandom();
 
-    public UsuarioService(UsuarioRepository usuarioRepository) {
+    private final UsuarioRepository usuarioRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder) {
         this.usuarioRepository = usuarioRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public List<UsuarioDTO> getAllUsuarios() {
         return usuarioRepository.findAll().stream()
                 .map(this::mapToDTO)
                 .toList();
+    }
+
+    /**
+     * Creates a new administrator account with a random temporary password.
+     * This endpoint only creates ROLE_ADMIN accounts; teachers self-register via /auth/register.
+     */
+    public UsuarioCreateResponseDTO createAdmin(UsuarioCreateRequestDTO request) {
+        if (request.nombre() == null || request.nombre().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El nombre es obligatorio");
+        }
+        if (request.email() == null || request.email().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El email es obligatorio");
+        }
+        usuarioRepository.findByEmail(request.email().trim()).ifPresent(existing -> {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El email ya está registrado");
+        });
+
+        String temporaryPassword = generateTemporaryPassword();
+        Usuario usuario = new Usuario(
+                request.email().trim(),
+                passwordEncoder.encode(temporaryPassword),
+                request.nombre().trim(),
+                RolUsuario.ROLE_ADMIN
+        );
+        usuario.setMustChangePassword(true);
+
+        Usuario saved;
+        try {
+            saved = usuarioRepository.save(usuario);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El email ya está registrado");
+        }
+        return new UsuarioCreateResponseDTO(mapToDTO(saved), temporaryPassword);
+    }
+
+    private String generateTemporaryPassword() {
+        StringBuilder password = new StringBuilder(TEMPORARY_PASSWORD_LENGTH);
+        for (int i = 0; i < TEMPORARY_PASSWORD_LENGTH; i++) {
+            password.append(PASSWORD_CHARS.charAt(RANDOM.nextInt(PASSWORD_CHARS.length())));
+        }
+        return password.toString();
     }
 
     public UsuarioDTO getUsuarioById(String id) {
@@ -42,7 +95,11 @@ public class UsuarioService {
         usuario.setRol(request.rol());
         usuario.setUpdatedAt(LocalDateTime.now());
 
-        return mapToDTO(usuarioRepository.save(usuario));
+        try {
+            return mapToDTO(usuarioRepository.save(usuario));
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El email ya está registrado");
+        }
     }
 
     public void deleteUsuario(String id, String authenticatedEmail) {

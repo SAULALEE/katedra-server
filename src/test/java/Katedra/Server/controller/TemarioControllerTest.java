@@ -59,6 +59,9 @@ class TemarioControllerTest {
     @MockitoBean
     private org.springframework.security.core.userdetails.UserDetailsService userDetailsService;
 
+    @MockitoBean
+    private Katedra.Server.repository.UsuarioRepository usuarioRepository;
+
     private Principal mockPrincipal;
     private TemarioResponseDTO mockResponse;
 
