@@ -29,6 +29,12 @@ public class JwtService {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("rol", usuario.getRol());
         extraClaims.put("nombre", usuario.getNombre());
+        // Display only. Lets the OAuth callback, which builds the session purely from the
+        // token, paint the right plan badge on first render. Backend gates always read the
+        // plan from the database: this token lives an hour, and the plan changes
+        // mid-session at checkout, so trusting the claim would grant PRO for up to an hour
+        // after a cancellation and deny it for up to an hour after a purchase.
+        extraClaims.put("plan", usuario.getPlan());
         return buildToken(extraClaims, usuario, jwtExpiration);
     }
 

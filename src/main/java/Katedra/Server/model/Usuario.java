@@ -48,6 +48,16 @@ public class Usuario {
     @Column(name = "ai_generation_count", nullable = false)
     private long aiGenerationCount;
 
+    /**
+     * Billing tier. Denormalized from the latest {@link Suscripcion} so that the plan
+     * gates can be checked without a join on every generation request. The authority is
+     * still Stripe: this field is only ever written by
+     * {@code SuscripcionService.sincronizarDesdeStripe}, from live Stripe state.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "plan", nullable = false)
+    private PlanUsuario plan = PlanUsuario.FREE;
+
     @Column(name = "must_change_password", nullable = false)
     private boolean mustChangePassword = false;
 
@@ -81,6 +91,8 @@ public class Usuario {
     public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
     public long getAiGenerationCount() { return aiGenerationCount; }
     public void setAiGenerationCount(long aiGenerationCount) { this.aiGenerationCount = aiGenerationCount; }
+    public PlanUsuario getPlan() { return plan; }
+    public void setPlan(PlanUsuario plan) { this.plan = plan; }
     public boolean isMustChangePassword() { return mustChangePassword; }
     public void setMustChangePassword(boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
 }
