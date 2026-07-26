@@ -167,6 +167,7 @@ public class AuthService {
     }
 
     private UsuarioDTO mapToDTO(Usuario usuario) {
-        return new UsuarioDTO(usuario.getId(), usuario.getEmail(), usuario.getNombre(), usuario.getRol());
+        return new UsuarioDTO(usuario.getId(), usuario.getEmail(), usuario.getNombre(),
+                usuario.getRol(), usuario.getPlan(), usuario.getCreatedAt());
     }
 }

@@ -16,8 +16,7 @@ import java.io.UncheckedIOException;
  * export reads as a continuation of the product rather than a generic document:
  *
  * <ul>
- *   <li>Inter — headings and titles ({@code .markdown-body h1-h4}, slide titles, page titles)</li>
- *   <li>Manrope — body copy, labels and eyebrows ({@code .markdown-body p,li}, badges, footers)</li>
+ *   <li>Inter — headings, body copy, labels and eyebrows</li>
  *   <li>JetBrains Mono — code blocks ({@code .markdown-body code})</li>
  * </ul>
  *
@@ -38,9 +37,6 @@ public class PdfFuentes {
     private final byte[] interSemibold = leer("Inter-SemiBold.ttf");
     private final byte[] interBold = leer("Inter-Bold.ttf");
     private final byte[] interItalic = leer("Inter-Italic.ttf");
-    private final byte[] manropeMedium = leer("Manrope-Medium.ttf");
-    private final byte[] manropeBold = leer("Manrope-Bold.ttf");
-    private final byte[] manropeExtraBold = leer("Manrope-ExtraBold.ttf");
     private final byte[] jetBrainsMono = leer("JetBrainsMono-Regular.ttf");
 
     /**
@@ -51,7 +47,7 @@ public class PdfFuentes {
      */
     public record Juego(
             PDFont interRegular, PDFont interSemibold, PDFont interBold, PDFont interItalic,
-            PDFont manropeMedium, PDFont manropeBold, PDFont manropeExtraBold, PDFont mono) {
+            PDFont mono) {
 
         /** Body text face for a styled fragment; bold wins over italic when both are set. */
         public PDFont para(boolean esNegrita, boolean esCursiva, boolean esCodigo) {
@@ -59,14 +55,14 @@ public class PdfFuentes {
                 return mono;
             }
             if (esNegrita) {
-                return manropeBold;
+                return interBold;
             }
-            return esCursiva ? interItalic : manropeMedium;
+            return esCursiva ? interItalic : interRegular;
         }
 
         /** Regular body face — used as the default/marker font wherever no styling applies. */
         public PDFont regular() {
-            return manropeMedium;
+            return interRegular;
         }
 
         /** Heading face for the given markdown level (H1 gets more weight than H3+). */
@@ -81,9 +77,6 @@ public class PdfFuentes {
                 cargarFuente(documento, interSemibold),
                 cargarFuente(documento, interBold),
                 cargarFuente(documento, interItalic),
-                cargarFuente(documento, manropeMedium),
-                cargarFuente(documento, manropeBold),
-                cargarFuente(documento, manropeExtraBold),
                 cargarFuente(documento, jetBrainsMono));
     }
 

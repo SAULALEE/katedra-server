@@ -31,6 +31,7 @@
 		<spring-ai.version>2.0.0</spring-ai.version>
 		<poi.version>5.4.1</poi.version>
 		<commonmark.version>0.24.0</commonmark.version>
+		<stripe.version>29.2.0</stripe.version>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
@@ -89,6 +90,17 @@
 			<groupId>org.jsoup</groupId>
 			<artifactId>jsoup</artifactId>
 			<version>1.21.1</version>
+		</dependency>
+		<!-- stripe-java: Free/Pro subscription billing. Not managed by the Spring Boot BOM,
+		     so the version is pinned explicitly like the other third-party libraries here.
+		     The SDK version determines the pinned Stripe API version, which in turn decides
+		     how the client secret is reached on an incomplete subscription
+		     (latest_invoice.confirmation_secret on 2025-03-31.basil and later). Bumping this
+		     is an API-version change, not a routine upgrade. -->
+		<dependency>
+			<groupId>com.stripe</groupId>
+			<artifactId>stripe-java</artifactId>
+			<version>${stripe.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

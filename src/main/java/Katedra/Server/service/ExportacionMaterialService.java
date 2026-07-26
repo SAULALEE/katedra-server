@@ -36,11 +36,15 @@ public class ExportacionMaterialService {
     private final ContenidoTemarioRepository contenidoTemarioRepository;
     private final Map<FormatoExportacion, ExportadorMaterial> exportadores = new EnumMap<>(FormatoExportacion.class);
 
+    private final PlanLimitService planLimitService;
+
     public ExportacionMaterialService(TemarioAccessGuard guard,
                                       ContenidoTemarioRepository contenidoTemarioRepository,
+                                      PlanLimitService planLimitService,
                                       List<ExportadorMaterial> exportadores) {
         this.guard = guard;
         this.contenidoTemarioRepository = contenidoTemarioRepository;
+        this.planLimitService = planLimitService;
         exportadores.forEach(exportador -> this.exportadores.put(exportador.formato(), exportador));
     }
 
@@ -66,6 +70,12 @@ public class ExportacionMaterialService {
         validarCombinacion(pieza, formato);
 
         Temario temario = guard.findOwnedTemario(temarioId, userEmail);
+
+        // After the ownership check on purpose: a plan-based 403 raised earlier would
+        // reveal whether someone else's temario exists.
+        planLimitService.validarExportacion(temario.getUsuario(), pieza, formato);
+        planLimitService.reservarExportacion(temario.getUsuario());
+
         ContenidoTemario contenido = contenidoTemarioRepository.findByTemarioId(temarioId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Este temario todavía no tiene material generado"));
