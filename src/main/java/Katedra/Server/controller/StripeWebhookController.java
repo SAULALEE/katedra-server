@@ -50,8 +50,7 @@ public class StripeWebhookController {
         try {
             event = stripeService.verificarEvento(payload, firma);
         } catch (ResponseStatusException e) {
-            // An invalid signature is the only thing that earns a 4xx here.
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.status(e.getStatusCode()).build();
         }
 
         try {
