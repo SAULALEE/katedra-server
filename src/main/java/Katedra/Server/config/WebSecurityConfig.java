@@ -66,6 +66,7 @@ public class WebSecurityConfig {
                 // Stripe carries no JWT. Authenticity is established by the webhook
                 // signature check in StripeService, not by this chain.
                 .requestMatchers("/webhooks/stripe", "/api/v1/webhooks/stripe").permitAll()
+                .requestMatchers(HttpMethod.GET, "/suscripciones/planes", "/api/v1/suscripciones/planes").permitAll()
                 // Billing is available to any signed-in user, regardless of role.
                 .requestMatchers("/suscripciones/**", "/api/v1/suscripciones/**").authenticated()
                 // Any authenticated user can change their own password

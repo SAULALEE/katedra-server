@@ -109,6 +109,32 @@ class StripeServiceTest {
         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }
 
+    @Test
+    @DisplayName("An empty publishable key stops checkout before returning unusable configuration")
+    void publishableKeyVaciaEs503() {
+        StripeService sinPublishableKey = new StripeService(
+                stripeClient, "", "whsec", "price_mensual", "price_anual");
+
+        ResponseStatusException ex = (ResponseStatusException) catchThrowable(
+                sinPublishableKey::getPublishableKey);
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    @Test
+    @DisplayName("A missing webhook secret is a deployment error, not an invalid Stripe signature")
+    void webhookSecretVacioEs503() {
+        StripeService sinWebhookSecret = new StripeService(
+                stripeClient, "pk_test_dummy", "", "price_mensual", "price_anual");
+
+        ResponseStatusException ex = (ResponseStatusException) catchThrowable(() ->
+                sinWebhookSecret.verificarEvento(
+                        "{\"id\":\"evt_1\",\"type\":\"invoice.paid\"}",
+                        "t=1,v1=firma"));
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
     // --- SDK response shape ---
 
     @Test
