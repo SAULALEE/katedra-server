@@ -17,70 +17,63 @@
 
 ---
 
-## Step 1: Create Stripe Product and Prices
+## Step 1: Gather Stripe API Keys
 
-### In Stripe Dashboard (test mode)
+### In Stripe Dashboard (test mode — check the toggle says "Test mode")
+1. **Developers** → **API keys**
+2. **Secret key**: `sk_test_...` → copy
+3. **Publishable key**: `pk_test_...` → copy
 
-1. **Products** → **+ New Product**
-   - Name: `Katedra Pro`
-   - Type: Recurring
-   - Recurring: 
-     - Billing interval: monthly
-     - Amount: $19.00 USD
-     - Save → copies **Price ID** (e.g., `price_1Hy2z5...`)
+No product or price needs to be created by hand; the script in Step 2 does it.
 
-2. Repeat for annual:
-   - Same product (not new)
-   - Add pricing plan:
-     - Billing interval: yearly
-     - Amount: $180.00 USD
-     - Save → copies **Price ID** (e.g., `price_1Hy2z6...`)
+---
 
-### Copy these Price IDs
-You'll need them in the next step. Example format:
+## Step 2: Run the Setup Script
+
+`scripts/setup_stripe.py` creates the `Katedra Pro` product, both recurring prices
+($19.00/month, $180.00/year, matching `utils/plan.js` on the client), and writes every
+secret to Doppler. It is idempotent: an existing product, and any price with the same
+amount and interval, are reused rather than duplicated.
+
+```bash
+cd katedra-server
+export STRIPE_SECRET_KEY=sk_test_...
+export STRIPE_PUBLISHABLE_KEY=pk_test_...
+python3 scripts/setup_stripe.py
 ```
-STRIPE_PRICE_PRO_MENSUAL=price_1Hy2z5GJV7XvQr7...
-STRIPE_PRICE_PRO_ANUAL=price_1Hy2z6GJV7XvQr7...
+
+It refuses `sk_live_` keys on purpose: this project bills in test mode only.
+
+Verify:
+```bash
+doppler secrets --only-names | grep STRIPE
 ```
 
 ---
 
-## Step 2: Gather Stripe Secrets
+## Step 3: Add the Webhook Secret
 
-### In Stripe Dashboard
-1. **Developers** → **API keys** (top right)
-2. **Secret key** (standard): `sk_test_...` → copy
-3. **Publishable key**: `pk_test_...` → copy
+The checkout completes without this — the browser confirms explicitly via
+`POST /suscripciones/{id}/confirmar`, and the webhook is the safety net for when that call
+never lands. Add it once the endpoint exists:
 
 ### In Stripe Dashboard → Webhooks
 1. **Webhooks** → **+ Add endpoint**
    - URL: `http://localhost:8080/api/v1/webhooks/stripe` (local testing)
      - For prod: your actual domain
-   - Events to send: 
+   - Events to send:
      - `invoice.paid`
      - `invoice.payment_failed`
      - `customer.subscription.updated`
      - `customer.subscription.deleted`
-   - Save → **Signing secret** (whsec_...): copy
-
----
-
-## Step 3: Add Secrets to Doppler
-
-**Via Doppler CLI or Dashboard:**
+   - Save → **Signing secret** (`whsec_...`): copy
 
 ```bash
-doppler secrets set STRIPE_SECRET_KEY "sk_test_..."
-doppler secrets set STRIPE_PUBLISHABLE_KEY "pk_test_..."
 doppler secrets set STRIPE_WEBHOOK_SECRET "whsec_..."
-doppler secrets set STRIPE_PRICE_PRO_MENSUAL "price_1Hy2z5..."
-doppler secrets set STRIPE_PRICE_PRO_ANUAL "price_1Hy2z6..."
 ```
 
-Verify:
-```bash
-doppler secrets list | grep STRIPE
-```
+For local testing, `stripe listen` (Step 5) prints its own signing secret — use that one
+instead while developing.
 
 ---
 
@@ -145,11 +138,12 @@ Back in Terminal 1, watch logs for:
 
 ### Flow
 1. Open `http://localhost:5173/dashboard`
-2. Click gear icon (bottom-left) → **Mejorar a Pro**
-3. Enter test billing details (any name, any email)
-4. Card tab appears
-5. Enter test card: `4242 4242 4242 4242` / `12/25` / `123`
-6. Click **Mejorar a Pro**
+2. Click gear icon (bottom-left) → **Mejorar a Pro** → plan modal → **Mejorar a Pro**
+3. The checkout page opens: cycle selector, order summary, renewal notice, payment method
+4. Fill billing details (name, email and country are required) → **Continuar al pago**
+5. The card block reveals in place below the details
+6. Enter test card: `4242 4242 4242 4242` / `12/25` / `123`
+7. Tick the recurring-charge consent → **Suscribirse**
 
 **Expected outcomes:**
 
