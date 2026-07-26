@@ -13,6 +13,7 @@ import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.SuscripcionRepository;
 import Katedra.Server.repository.UsuarioRepository;
 import com.stripe.model.Subscription;
+import com.stripe.model.Event;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,8 +24,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.lang.reflect.Method;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -183,6 +186,39 @@ class SuscripcionServiceTest {
         assertThat(respuesta.clientSecret()).isEqualTo("pi_secret_reutilizado");
         verify(stripeService, never()).crearSuscripcionIncompleta(anyString(), anyString(), anyString());
         verify(suscripcionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("An expired incomplete subscription is replaced because Stripe cannot confirm it anymore")
+    void iniciarReemplazaLaSuscripcionIncompletaExpirada() {
+        suscripcion.setEstado(EstadoSuscripcion.INCOMPLETA);
+        given(usuarioRepository.findByEmail(EMAIL)).willReturn(Optional.of(usuario));
+        given(suscripcionRepository.findFirstByUsuarioIdAndEstadoOrderByCreatedAtDesc(
+                "user-1", EstadoSuscripcion.INCOMPLETA)).willReturn(Optional.of(suscripcion));
+        given(stripeService.recuperarSuscripcion(STRIPE_SUB_ID))
+                .willReturn(stripeSubConEstado("incomplete_expired"));
+        given(suscripcionRepository.findFirstByUsuarioIdOrderByCreatedAtDesc("user-1"))
+                .willReturn(Optional.of(suscripcion));
+        given(stripeService.asegurarCustomer(any(), any(), any())).willReturn(STRIPE_CUSTOMER_ID);
+        given(stripeService.resolverPriceId(CicloFacturacion.MENSUAL)).willReturn("price_mensual");
+        given(stripeService.crearSuscripcionIncompleta(any(), any(), any()))
+                .willReturn(stripeSubConEstado("incomplete"));
+        given(stripeService.extraerClientSecret(any())).willReturn("pi_secret_nuevo");
+        given(suscripcionRepository.save(any())).willAnswer(i -> i.getArgument(0));
+
+        IniciarSuscripcionResponseDTO respuesta = suscripcionService.iniciar(EMAIL, peticionMensual());
+
+        assertThat(respuesta.clientSecret()).isEqualTo("pi_secret_nuevo");
+        verify(stripeService).crearSuscripcionIncompleta(
+                STRIPE_CUSTOMER_ID, "price_mensual", "user-1");
+    }
+
+    @Test
+    @DisplayName("Webhook processing owns a transaction so subscription and user update atomically")
+    void procesarEventoEsTransaccional() throws NoSuchMethodException {
+        Method method = SuscripcionService.class.getMethod("procesarEvento", Event.class);
+
+        assertThat(method.getAnnotation(Transactional.class)).isNotNull();
     }
 
     @Test

@@ -65,23 +65,27 @@ public class SuscripcionService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya tienes el plan Pro activo.");
         }
 
+        String publishableKey = stripeService.getPublishableKey();
+        String priceId = stripeService.resolverPriceId(request.ciclo());
+
         Optional<Suscripcion> enCurso = suscripcionRepository
                 .findFirstByUsuarioIdAndEstadoOrderByCreatedAtDesc(usuario.getId(), EstadoSuscripcion.INCOMPLETA)
                 .filter(s -> s.getCiclo() == request.ciclo());
 
         if (enCurso.isPresent()) {
             Suscripcion suscripcion = enCurso.get();
-            stripeService.asegurarCustomer(usuario, request.facturacion(), suscripcion.getStripeCustomerId());
             Subscription stripeSub = stripeService.recuperarSuscripcion(suscripcion.getStripeSubscriptionId());
-            return new IniciarSuscripcionResponseDTO(
-                    suscripcion.getId(),
-                    stripeService.extraerClientSecret(stripeSub),
-                    stripeService.getPublishableKey(),
-                    suscripcion.getCiclo());
+            if ("incomplete".equals(stripeSub.getStatus())) {
+                stripeService.asegurarCustomer(usuario, request.facturacion(), suscripcion.getStripeCustomerId());
+                return new IniciarSuscripcionResponseDTO(
+                        suscripcion.getId(),
+                        stripeService.extraerClientSecret(stripeSub),
+                        publishableKey,
+                        suscripcion.getCiclo());
+            }
         }
 
         String customerId = stripeService.asegurarCustomer(usuario, request.facturacion(), customerIdPrevio(usuario));
-        String priceId = stripeService.resolverPriceId(request.ciclo());
         Subscription stripeSub = stripeService.crearSuscripcionIncompleta(customerId, priceId, usuario.getId());
 
         Suscripcion suscripcion = new Suscripcion(
@@ -92,7 +96,7 @@ public class SuscripcionService {
         return new IniciarSuscripcionResponseDTO(
                 guardada.getId(),
                 stripeService.extraerClientSecret(stripeSub),
-                stripeService.getPublishableKey(),
+                publishableKey,
                 guardada.getCiclo());
     }
 
@@ -203,6 +207,7 @@ public class SuscripcionService {
      * else is acknowledged and ignored: returning an error for an event we do not handle
      * would make Stripe retry it indefinitely.
      */
+    @Transactional
     public void procesarEvento(Event event) {
         String tipo = event.getType();
 
@@ -214,14 +219,7 @@ public class SuscripcionService {
                     log.warn("Evento {} sin subscription id, se ignora", tipo);
                     return;
                 }
-                try {
-                    sincronizarDesdeStripe(subscriptionId);
-                } catch (ResponseStatusException e) {
-                    // A subscription we have no row for (e.g. created directly in the
-                    // Stripe dashboard). Logged, not retried: Stripe would hammer us.
-                    log.warn("No se pudo sincronizar {} desde el evento {}: {}",
-                            subscriptionId, tipo, e.getReason());
-                }
+                sincronizarDesdeStripe(subscriptionId);
             }
             default -> log.debug("Evento de Stripe ignorado: {}", tipo);
         }

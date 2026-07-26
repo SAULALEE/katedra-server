@@ -9,6 +9,7 @@ import com.stripe.exception.StripeException;
 import com.stripe.model.Customer;
 import com.stripe.model.Event;
 import com.stripe.model.Invoice;
+import com.stripe.model.Price;
 import com.stripe.model.Subscription;
 import com.stripe.model.SubscriptionItem;
 import com.stripe.net.Webhook;
@@ -62,6 +63,11 @@ public class StripeService {
     }
 
     public String getPublishableKey() {
+        if (publishableKey == null || publishableKey.isBlank()) {
+            log.error("Falta la clave publicable de Stripe");
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Los pagos no están disponibles en este momento.");
+        }
         return publishableKey;
     }
 
@@ -76,6 +82,15 @@ public class StripeService {
                     "Los pagos no están disponibles en este momento.");
         }
         return priceId;
+    }
+
+    /** Public catalog data. Amount and currency always come from the configured Stripe Price. */
+    public Price recuperarPrecio(CicloFacturacion ciclo) {
+        try {
+            return stripeClient.prices().retrieve(resolverPriceId(ciclo));
+        } catch (StripeException e) {
+            throw traducir(e, "No pudimos consultar los precios en este momento.");
+        }
     }
 
     /**
@@ -192,6 +207,11 @@ public class StripeService {
      * Stripe sent, so deserializing and re-serializing anywhere upstream invalidates it.
      */
     public Event verificarEvento(String payload, String firma) {
+        if (webhookSecret == null || webhookSecret.isBlank()) {
+            log.error("Falta el secreto del webhook de Stripe");
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "El webhook de pagos no está configurado.");
+        }
         try {
             return Webhook.constructEvent(payload, firma, webhookSecret);
         } catch (SignatureVerificationException e) {
