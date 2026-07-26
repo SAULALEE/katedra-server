@@ -247,7 +247,7 @@ public class PdfExportador implements ExportadorMaterial {
         // Reserve the whole question so it is never split across two pages.
         layout.asegurarEspacio(46f + (opciones.size() * 15f));
 
-        layout.textoConFuente("Pregunta " + (indice + 1), juego.manropeExtraBold(), 9f, 12f, 0f, TINTA);
+        layout.textoConFuente("Pregunta " + (indice + 1), juego.interBold(), 9f, 12f, 0f, TINTA);
         layout.espacio(2f);
         layout.parrafo(planos(pregunta.pregunta()), 11f, 15f, 0f, TINTA);
         layout.espacio(4f);
@@ -328,7 +328,7 @@ public class PdfExportador implements ExportadorMaterial {
         layout.rectangulo(margenX, layout.getY() - 6f, 80f, 6f, colorTema);
         layout.espacio(30f);
 
-        layout.textoConFuente(MarcaDocumento.lineaMateria(material.materia()), juego.manropeExtraBold(),
+        layout.textoConFuente(MarcaDocumento.lineaMateria(material.materia()), juego.interBold(),
                 15f, 20f, margenX, colorTema);
         layout.espacio(34f);
 
@@ -342,7 +342,7 @@ public class PdfExportador implements ExportadorMaterial {
 
         if (!puntos.isEmpty()) {
             layout.textoConFuente(String.join("  ·  ", puntos.subList(0, Math.min(2, puntos.size()))),
-                    juego.manropeBold(), 14f, 20f, margenX, colorSubtitulo);
+                    juego.interBold(), 14f, 20f, margenX, colorSubtitulo);
         }
     }
 
@@ -376,11 +376,11 @@ public class PdfExportador implements ExportadorMaterial {
         layout.textoConFuente(String.format("%02d", indice + 1), juego.titulo(1), 42f, 46f,
                 padSidebarX, anchoSidebar - (2 * padSidebarX), colorNumero);
         layout.espacio(16f);
-        layout.textoConFuente(MarcaDocumento.lineaMateria(material.materia()), juego.manropeBold(),
+        layout.textoConFuente(MarcaDocumento.lineaMateria(material.materia()), juego.interBold(),
                 12f, 18f, padSidebarX, anchoSidebar - (2 * padSidebarX), BLANCO);
         layout.espacio(12f);
         Color colorTemarioSidebar = oscuro ? MUTED_DARK : MUTED_SIDEBAR_LIGHT;
-        layout.textoConFuente(material.temarioTitulo(), juego.manropeMedium(), 14f, 20f,
+        layout.textoConFuente(material.temarioTitulo(), juego.interRegular(), 14f, 20f,
                 padSidebarX, anchoSidebar - (2 * padSidebarX), colorTemarioSidebar);
 
         // --- content column ---

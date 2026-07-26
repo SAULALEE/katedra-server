@@ -45,7 +45,7 @@ public class PptxExportador implements ExportadorMaterial {
     private static final Dimension TAMANO = new Dimension(960, 540);
 
     private static final String FUENTE_TITULO = "Inter";
-    private static final String FUENTE_CUERPO = "Manrope";
+    private static final String FUENTE_CUERPO = "Inter";
 
     private static final Color TINTA = new Color(0x0F, 0x17, 0x2A);
     private static final Color TEXTO = new Color(0x33, 0x41, 0x55);
@@ -225,7 +225,7 @@ public class PptxExportador implements ExportadorMaterial {
     }
 
     // The exact required copyright line — not the web preview's "Creado por Katedra" watermark
-    // text, but styled the same way (Manrope, muted, centered) so it reads as part of the design.
+    // text, but styled the same way (Inter, muted, centered) so it reads as part of the design.
     private void pie(XSLFSlide slide, Color colorMuted) {
         cajaCentrada(slide, new Rectangle(0, 500, TAMANO.width, 24), MarcaDocumento.PIE_PAGINA, FUENTE_CUERPO, 10, true, colorMuted);
     }
