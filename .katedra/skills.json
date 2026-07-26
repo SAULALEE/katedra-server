@@ -1,0 +1,74 @@
+{
+  "skills": [
+    {
+      "name": "Caveman Method",
+      "file": "skills/00-core/caveman-method.md",
+      "status": "Active"
+    },
+    {
+      "name": "System Context & Technology Stack",
+      "file": "skills/architecture/context.md",
+      "status": "Active"
+    },
+    {
+      "name": "Backend Architecture & Data Flow",
+      "file": "skills/architecture/architecture.md",
+      "status": "Active"
+    },
+    {
+      "name": "Architectural Decision Records (ADR) & Policy Keeper",
+      "file": "skills/architecture/decisions.md",
+      "status": "Active"
+    },
+    {
+      "name": "Database Architecture, JPA, & Flyway",
+      "file": "skills/database/database-jpa-architect.md",
+      "status": "Active"
+    },
+    {
+      "name": "Git Branching Strategy & Workflow",
+      "file": "skills/git/git-workflow.md",
+      "status": "Active"
+    },
+    {
+      "name": "AI Integration & Prompt Engineering",
+      "file": "skills/workflows/ai-integration.md",
+      "status": "Active"
+    },
+    {
+      "name": "Backend Testing Strategy & TDD",
+      "file": "skills/workflows/test-driven-development.md",
+      "status": "Active"
+    },
+    {
+      "name": "Subagent-Driven Development",
+      "file": "skills/workflows/subagent-driven-development.md",
+      "status": "Active"
+    },
+    {
+      "name": "Security Hardening",
+      "file": "skills/security/security-hardening.md",
+      "status": "Active"
+    },
+    {
+      "name": "Spring Boot Patterns",
+      "file": "skills/architecture/springboot-patterns.md",
+      "status": "Active"
+    },
+    {
+      "name": "API Design Patterns",
+      "file": "skills/architecture/api-design-patterns.md",
+      "status": "Active"
+    },
+    {
+      "name": "Systematic Debugging",
+      "file": "skills/workflows/systematic-debugging.md",
+      "status": "Active"
+    },
+    {
+      "name": "Verification Before Completion",
+      "file": "skills/workflows/verification-before-completion.md",
+      "status": "Active"
+    }
+  ]
+}

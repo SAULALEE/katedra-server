@@ -19,11 +19,18 @@ public class Usuario {
     @Column(name = "email", nullable = false, unique = true)
     private String email;
 
-    @Column(name = "password", nullable = false)
+    @Column(name = "password")
     private String password;
 
     @Column(name = "nombre", nullable = false)
     private String nombre;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "auth_provider", nullable = false)
+    private AuthProvider authProvider = AuthProvider.LOCAL;
+
+    @Column(name = "provider_user_id")
+    private String providerUserId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "rol", nullable = false)
@@ -38,12 +45,29 @@ public class Usuario {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Column(name = "ai_generation_count", nullable = false)
+    private long aiGenerationCount;
+
+    /**
+     * Billing tier. Denormalized from the latest {@link Suscripcion} so that the plan
+     * gates can be checked without a join on every generation request. The authority is
+     * still Stripe: this field is only ever written by
+     * {@code SuscripcionService.sincronizarDesdeStripe}, from live Stripe state.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "plan", nullable = false)
+    private PlanUsuario plan = PlanUsuario.FREE;
+
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword = false;
+
     public Usuario() {}
 
     public Usuario(String email, String password, String nombre, RolUsuario rol) {
         this.email = email;
         this.password = password;
         this.nombre = nombre;
+        this.authProvider = AuthProvider.LOCAL;
         this.rol = rol;
     }
 
@@ -54,6 +78,10 @@ public class Usuario {
     public void setPassword(String password) { this.password = password; }
     public String getNombre() { return nombre; }
     public void setNombre(String nombre) { this.nombre = nombre; }
+    public AuthProvider getAuthProvider() { return authProvider; }
+    public void setAuthProvider(AuthProvider authProvider) { this.authProvider = authProvider; }
+    public String getProviderUserId() { return providerUserId; }
+    public void setProviderUserId(String providerUserId) { this.providerUserId = providerUserId; }
     public RolUsuario getRol() { return rol; }
     public void setRol(RolUsuario rol) { this.rol = rol; }
     public LocalDateTime getCreatedAt() { return createdAt; }
@@ -61,4 +89,10 @@ public class Usuario {
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     public LocalDateTime getDeletedAt() { return deletedAt; }
     public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+    public long getAiGenerationCount() { return aiGenerationCount; }
+    public void setAiGenerationCount(long aiGenerationCount) { this.aiGenerationCount = aiGenerationCount; }
+    public PlanUsuario getPlan() { return plan; }
+    public void setPlan(PlanUsuario plan) { this.plan = plan; }
+    public boolean isMustChangePassword() { return mustChangePassword; }
+    public void setMustChangePassword(boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
 }

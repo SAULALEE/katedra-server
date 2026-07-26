@@ -1,0 +1,515 @@
+openapi: 3.0.3
+info:
+  title: Katedra API Specification
+  description: >
+    API REST para Katedra, una plataforma inteligente de generación de contenido 
+    y material didáctico para docentes. Gestiona la autenticación de usuarios, la creación de 
+    temarios académicos y la generación de materiales didácticos (teoría, ejercicios, 
+    evaluaciones y diapositivas) mediante simulaciones e integraciones de IA.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Servidor de Desarrollo Local
+paths:
+  /auth/register:
+    post:
+      summary: Registro de nuevo usuario
+      tags:
+        - Autenticación
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRegisterRequest'
+      responses:
+        '200':
+          description: Registro exitoso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Error en los parámetros de entrada o correo ya registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      summary: Inicio de sesión
+      tags:
+        - Autenticación
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+      responses:
+        '200':
+          description: Autenticación exitosa, entrega de JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /temarios:
+    post:
+      summary: Crear un nuevo temario
+      security:
+        - BearerAuth: []
+      tags:
+        - Temarios
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemarioRequest'
+      responses:
+        '201':
+          description: Temario creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemarioResponse'
+        '401':
+          description: No autorizado (Falta JWT o expiró)
+
+    get:
+      summary: Listar los temarios del usuario autenticado
+      security:
+        - BearerAuth: []
+      tags:
+        - Temarios
+      responses:
+        '200':
+          description: Lista de temarios recuperada exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TemarioResponse'
+        '401':
+          description: No autorizado
+
+  /temarios/{id}:
+    get:
+      summary: Obtener el detalle de un temario específico
+      security:
+        - BearerAuth: []
+      tags:
+        - Temarios
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID único (UUID) del temario
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detalle del temario recuperado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemarioResponse'
+        '401':
+          description: No autorizado
+        '403':
+          description: Acceso denegado (el temario no pertenece al usuario autenticado)
+        '404':
+          description: Temario no encontrado
+
+    delete:
+      summary: Eliminar un temario (Soft Delete)
+      security:
+        - BearerAuth: []
+      tags:
+        - Temarios
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID único (UUID) del temario
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Temario marcado como eliminado (No Content)
+        '401':
+          description: No autorizado
+        '403':
+          description: Acceso denegado
+        '404':
+          description: Temario no encontrado
+
+  /temarios/{id}/contenido:
+    get:
+      summary: Obtener el material educativo generado de un temario
+      description: Recupera la teoría, ejercicios, quizzes y diapositivas. Si no existen, se genera la versión mock inicial.
+      security:
+        - BearerAuth: []
+      tags:
+        - Contenido y Materiales
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID único (UUID) del temario
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Contenido recuperado o simulado con éxito
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContenidoTemarioResponse'
+        '401':
+          description: No autorizado
+        '403':
+          description: Acceso denegado
+        '404':
+          description: Temario no encontrado
+
+  /temarios/{temarioId}/exportaciones:
+    get:
+      summary: Descargar una pieza del material generado como archivo
+      description: >
+        Devuelve la pieza indicada en el formato solicitado, con encabezado (materia y temario) y
+        el pie "© Katedra, 2026" en todas las páginas. El PDF se entrega cifrado sin permiso de
+        modificación y el DOCX con protección de sólo lectura.
+        Combinaciones válidas: teoria → docx|pdf|md · evaluacion → docx|pdf|md|gs · diapositivas → pptx|pdf.
+      security:
+        - BearerAuth: []
+      tags:
+        - Contenido y Materiales
+      parameters:
+        - name: temarioId
+          in: path
+          required: true
+          description: ID único (UUID) del temario
+          schema:
+            type: string
+            format: uuid
+        - name: pieza
+          in: query
+          required: true
+          description: Pieza de material a exportar
+          schema:
+            type: string
+            enum: [teoria, evaluacion, diapositivas]
+        - name: formato
+          in: query
+          required: true
+          description: Formato del archivo. `gs` genera un script de Google Apps Script que crea el formulario.
+          schema:
+            type: string
+            enum: [docx, pdf, md, pptx, gs]
+      responses:
+        '200':
+          description: Archivo generado
+          headers:
+            Content-Disposition:
+              description: attachment con el nombre de archivo (materia-temario-pieza.ext)
+              schema:
+                type: string
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.presentationml.presentation:
+              schema:
+                type: string
+                format: binary
+            text/markdown:
+              schema:
+                type: string
+            text/javascript:
+              schema:
+                type: string
+        '400':
+          description: Pieza o formato no válido, o combinación no soportada
+        '401':
+          description: No autorizado
+        '403':
+          description: El temario pertenece a otro usuario
+        '404':
+          description: Temario no encontrado o pieza sin material generado
+
+  /temarios/{id}/generar-material:
+    post:
+      summary: Forzar la generación/actualización del material didáctico para un temario existente
+      security:
+        - BearerAuth: []
+      tags:
+        - Contenido y Materiales
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID único (UUID) del temario
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Material didáctico generado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContenidoTemarioResponse'
+        '401':
+          description: No autorizado
+        '403':
+          description: Acceso denegado
+
+  /temarios/generar-material:
+    post:
+      summary: Generar temario y material educativo desde cero
+      security:
+        - BearerAuth: []
+      tags:
+        - Contenido y Materiales
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerarMaterialRequest'
+      responses:
+        '200':
+          description: Temario y materiales creados exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContenidoTemarioResponse'
+        '401':
+          description: No autorizado
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    AuthRegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - nombre
+      properties:
+        email:
+          type: string
+          format: email
+          example: profesor@katedra.com
+        password:
+          type: string
+          format: password
+          example: Secr3tP@ssword
+        nombre:
+          type: string
+          example: Saúl Alejandro
+
+    AuthLoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: profesor@katedra.com
+        password:
+          type: string
+          format: password
+          example: Secr3tP@ssword
+
+    UsuarioDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: a7b1897c-9304-4f92-9aef-88cfab41f92e
+        email:
+          type: string
+          format: email
+          example: profesor@katedra.com
+        nombre:
+          type: string
+          example: Saúl Alejandro
+        rol:
+          type: string
+          enum: [ROLE_ADMIN, ROLE_PROFESOR, ROLE_USER]
+          example: ROLE_PROFESOR
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Token JWT firmado para autorizar peticiones REST
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        usuario:
+          $ref: '#/components/schemas/UsuarioDTO'
+
+    TemarioRequest:
+      type: object
+      required:
+        - titulo
+      properties:
+        titulo:
+          type: string
+          example: Estructuras de Datos Lineales
+        descripcion:
+          type: string
+          example: Planificación didáctica sobre listas enlazadas, pilas y colas.
+        gradoAcademico:
+          type: string
+          enum: [primaria, secundaria, bachillerato, universitario, posgrado]
+          example: universitario
+        asignatura:
+          type: string
+          example: Programación I
+
+    TemarioResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: c9d021f1-37f2-4bc4-9d51-46bb907eb6e5
+        titulo:
+          type: string
+          example: Estructuras de Datos Lineales
+        descripcion:
+          type: string
+          example: Planificación didáctica sobre listas enlazadas, pilas y colas.
+        gradoAcademico:
+          type: string
+          enum: [primaria, secundaria, bachillerato, universitario, posgrado]
+          example: universitario
+        asignatura:
+          type: string
+          example: Programación I
+        createdAt:
+          type: string
+          format: date-time
+          example: 2026-06-17T16:00:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          example: 2026-06-17T16:15:00Z
+
+    GenerarMaterialRequest:
+      type: object
+      required:
+        - tema
+        - materia
+        - unidades
+      properties:
+        tema:
+          type: string
+          example: Estructuras de Datos Lineales
+        materia:
+          type: string
+          example: Programación I
+        unidades:
+          type: string
+          example: Unidad 1: Pilas y Listas Enlazadas
+
+    ContenidoTemarioResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 54ef9a12-1bfa-4c40-bbd4-cc9d5e1f0e21
+        temarioId:
+          type: string
+          format: uuid
+          example: c9d021f1-37f2-4bc4-9d51-46bb907eb6e5
+        teoria:
+          type: string
+          description: Contenido completo de teoría docente estructurado en formato Markdown.
+          example: "## Unidad 1: Estructuras de Datos Lineales..."
+        ejercicios:
+          type: string
+          description: Guías y problemas resueltos con bloques de código y explicaciones.
+          example: "## Ejercicios: Inversión de listas enlazadas..."
+        evaluacion:
+          type: array
+          description: Banco de preguntas tipo examen de opción múltiple estructurado en JSON.
+          items:
+            type: object
+            properties:
+              pregunta:
+                type: string
+                example: ¿Qué principio rige el funcionamiento de una Pila?
+              opciones:
+                type: array
+                items:
+                  type: string
+                example: ["FIFO", "LIFO", "LILO", "B-Tree"]
+              opcionCorrectaIndex:
+                type: integer
+                example: 1
+              explicacion:
+                type: string
+                example: Las pilas son estructuras de tipo LIFO (Last In, First Out).
+        diapositivas:
+          type: array
+          description: Secuencias de tarjetas conceptuales simplificadas.
+          items:
+            type: object
+            properties:
+              titulo:
+                type: string
+                example: La Lista Enlazada Simple
+              puntos:
+                type: array
+                items:
+                  type: string
+                example: ["Estructura del Nodo: Dato + Enlace", "Inserción O(1)", "Búsqueda O(n)"]
+
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: 2026-06-17T16:49:00Z
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: Bad Request
+        message:
+          type: string
+          example: El correo ya se encuentra registrado.
+        path:
+          type: string
+          example: /auth/register

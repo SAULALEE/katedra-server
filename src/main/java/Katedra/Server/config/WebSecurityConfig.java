@@ -1,16 +1,29 @@
 package Katedra.Server.config;
 
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -18,9 +31,29 @@ import java.util.List;
 public class WebSecurityConfig {
 
     private final AuthenticationProvider authenticationProvider;
+    private final JwtAuthenticationFilter jwtAuthFilter;
+    private final ObjectProvider<ClientRegistrationRepository> clientRegistrationRepositoryProvider;
+    private final ObjectProvider<OAuth2AuthenticationSuccessHandler> oAuth2AuthenticationSuccessHandlerProvider;
+    private final ObjectProvider<OAuth2AuthenticationFailureHandler> oAuth2AuthenticationFailureHandlerProvider;
+    @Value("${app.frontend.oauth.success-url:}")
+    private String frontendSuccessUrl;
+    @Value("${app.frontend.oauth.error-url:}")
+    private String frontendErrorUrl;
+    @Value("${app.cors.allowed-origins:http://localhost:5173}")
+    private String allowedOrigins;
 
-    public WebSecurityConfig(AuthenticationProvider authenticationProvider) {
+    public WebSecurityConfig(
+            AuthenticationProvider authenticationProvider,
+            JwtAuthenticationFilter jwtAuthFilter,
+            ObjectProvider<ClientRegistrationRepository> clientRegistrationRepositoryProvider,
+            ObjectProvider<OAuth2AuthenticationSuccessHandler> oAuth2AuthenticationSuccessHandlerProvider,
+            ObjectProvider<OAuth2AuthenticationFailureHandler> oAuth2AuthenticationFailureHandlerProvider
+    ) {
         this.authenticationProvider = authenticationProvider;
+        this.jwtAuthFilter = jwtAuthFilter;
+        this.clientRegistrationRepositoryProvider = clientRegistrationRepositoryProvider;
+        this.oAuth2AuthenticationSuccessHandlerProvider = oAuth2AuthenticationSuccessHandlerProvider;
+        this.oAuth2AuthenticationFailureHandlerProvider = oAuth2AuthenticationFailureHandlerProvider;
     }
 
     @Bean
@@ -29,25 +62,106 @@ public class WebSecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/auth/**").permitAll()
-                .anyRequest().authenticated()
+                .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // Public endpoints
+                .requestMatchers("/auth/**", "/api/v1/auth/**").permitAll()
+                .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
+                .requestMatchers("/error").permitAll()
+                // Stripe carries no JWT. Authenticity is established by the webhook
+                // signature check in StripeService, not by this chain.
+                .requestMatchers("/webhooks/stripe", "/api/v1/webhooks/stripe").permitAll()
+                .requestMatchers(HttpMethod.GET, "/suscripciones/planes", "/api/v1/suscripciones/planes").permitAll()
+                // Billing is available to any signed-in user, regardless of role.
+                .requestMatchers("/suscripciones/**", "/api/v1/suscripciones/**").authenticated()
+                // Any authenticated user can change their own password
+                .requestMatchers(HttpMethod.POST, "/usuarios/me/password", "/api/v1/usuarios/me/password").authenticated()
+                // ROLE_ADMIN: user management only
+                .requestMatchers("/usuarios/**", "/api/v1/usuarios/**").hasRole("ADMIN")
+                // ROLE_PROFESOR: academic features only
+                .requestMatchers("/asignaturas/**", "/api/v1/asignaturas/**").hasRole("PROFESOR")
+                .requestMatchers("/temarios/**", "/api/v1/temarios/**").hasRole("PROFESOR")
+                // Deny everything else
+                .anyRequest().denyAll()
+            )
+            .exceptionHandling(exceptions -> exceptions
+                .accessDeniedHandler((request, response, accessDeniedException) ->
+                        response.setStatus(HttpServletResponse.SC_FORBIDDEN))
+                .authenticationEntryPoint((request, response, authException) ->
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED))
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authenticationProvider(authenticationProvider);
+            .authenticationProvider(authenticationProvider)
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
+        ClientRegistrationRepository clientRegistrationRepository = clientRegistrationRepositoryProvider.getIfAvailable();
+        OAuth2AuthenticationSuccessHandler successHandler = oAuth2AuthenticationSuccessHandlerProvider.getIfAvailable();
+        OAuth2AuthenticationFailureHandler failureHandler = oAuth2AuthenticationFailureHandlerProvider.getIfAvailable();
+
+        if (clientRegistrationRepository != null
+                && successHandler != null
+                && failureHandler != null
+                && hasText(frontendSuccessUrl)
+                && hasText(frontendErrorUrl)) {
+            http.oauth2Login(oauth -> oauth
+                    .authorizationEndpoint(endpoint -> endpoint
+                            .authorizationRequestResolver(authorizationRequestResolver(clientRegistrationRepository)))
+                    .successHandler(successHandler)
+                    .failureHandler(failureHandler)
+            );
+        }
 
         return http.build();
     }
 
+    // Without prompt=select_account, Google/Microsoft silently reuse whatever
+    // session cookie is already in the browser and skip the account chooser —
+    // login and register (same /oauth2/authorization/{provider} endpoint, see
+    // OAuth2AuthenticationSuccessHandler#loginOrRegisterSocial) always land on
+    // the last-used account instead of letting the user pick.
+    private OAuth2AuthorizationRequestResolver authorizationRequestResolver(
+            ClientRegistrationRepository clientRegistrationRepository
+    ) {
+        DefaultOAuth2AuthorizationRequestResolver resolver = new DefaultOAuth2AuthorizationRequestResolver(
+                clientRegistrationRepository,
+                OAuth2AuthorizationRequestRedirectFilter.DEFAULT_AUTHORIZATION_REQUEST_BASE_URI
+        );
+        resolver.setAuthorizationRequestCustomizer(customizer ->
+                customizer.additionalParameters(params -> params.put("prompt", "select_account")));
+        return resolver;
+    }
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toList();
+
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("*"));
+        configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
+        // Without this the browser hides Content-Disposition from JS, so file downloads cannot
+        // read the server-provided filename. Invisible in dev (the Vite proxy is same-origin).
+        configuration.setExposedHeaders(List.of(HttpHeaders.CONTENT_DISPOSITION));
         configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    @Bean
+    public FilterRegistrationBean<JwtAuthenticationFilter> jwtAuthenticationFilterRegistration(
+            JwtAuthenticationFilter filter
+    ) {
+        FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 }
