@@ -377,7 +377,7 @@ class PdfLayout implements Closeable {
      * Draws one character per {@code Tj} operator instead of the whole word.
      *
      * <p>PDFBox 3 auto-applies GSUB ligature substitution (e.g. "fi" -> a single ligature glyph)
-     * when a font's table declares it, which both Inter and Manrope do. That substitution has a
+     * when a font's table declares it, which Inter does. That substitution has a
      * real correctness bug: the ligature glyph's ToUnicode entry comes out wrong, so copying or
      * searching the PDF silently corrupts every word with "fi", "fl", etc. (verified: "Definición"
      * extracts back as "Deznición"). Ligatures need at least two adjacent glyphs in the same

@@ -53,7 +53,7 @@ final class PdfBranding {
                     documento, pagina, PDPageContentStream.AppendMode.APPEND, true, true)) {
 
                 if (!compacto) {
-                    escribir(cs, lineaMateria, fuentes.manropeExtraBold(), TAM_MATERIA, GRIS, margen, alto - 52f);
+                    escribir(cs, lineaMateria, fuentes.interBold(), TAM_MATERIA, GRIS, margen, alto - 52f);
                     escribir(cs, lineaTemario, fuentes.interSemibold(), TAM_TEMARIO, TINTA, margen, alto - 68f);
                     cs.setStrokingColor(LINEA);
                     cs.setLineWidth(0.6f);

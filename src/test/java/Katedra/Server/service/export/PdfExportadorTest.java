@@ -104,7 +104,7 @@ class PdfExportadorTest {
     }
 
     /**
-     * Regression test: PDFBox auto-applies GSUB ligature substitution for Inter/Manrope, and the
+     * Regression test: PDFBox auto-applies GSUB ligature substitution for Inter, and the
      * substituted glyph's ToUnicode entry came out wrong — "Definición" extracted back as
      * "Deznición". Every word with "fi"/"fl" was silently corrupted on copy/search until fixed.
      */

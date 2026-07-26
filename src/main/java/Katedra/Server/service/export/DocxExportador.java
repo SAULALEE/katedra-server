@@ -43,10 +43,9 @@ import java.util.List;
 @Component
 public class DocxExportador implements ExportadorMaterial {
 
-    // Same two-font system the app itself uses: Inter for headings, Manrope for body copy and
-    // labels (mirrors .markdown-body's h1-h4/Inter vs p,li/Manrope split), JetBrains Mono for code.
+    // Inter is used for headings, body copy and labels; JetBrains Mono remains dedicated to code.
     private static final String FUENTE_TITULO = "Inter";
-    private static final String FUENTE_CUERPO = "Manrope";
+    private static final String FUENTE_CUERPO = "Inter";
     private static final String FUENTE_MONO = "JetBrains Mono";
     private static final String TINTA = "0F172A";
     private static final String GRIS = "64748B";
