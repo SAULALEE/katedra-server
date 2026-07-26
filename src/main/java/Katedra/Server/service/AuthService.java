@@ -5,6 +5,7 @@ import Katedra.Server.dto.AuthRegisterRequestDTO;
 import Katedra.Server.dto.AuthResponseDTO;
 import Katedra.Server.dto.PasswordChangeRequestDTO;
 import Katedra.Server.dto.UsuarioDTO;
+import Katedra.Server.exception.SocialAccountConflictException;
 import Katedra.Server.model.AuthProvider;
 import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.Usuario;
@@ -125,7 +126,9 @@ public class AuthService {
             String nombre
     ) {
         if (usuario.getAuthProvider() == AuthProvider.LOCAL && usuario.getPassword() != null) {
-            throw new RuntimeException("El email ya está registrado con login tradicional");
+            throw new SocialAccountConflictException(
+                    "local_account_exists",
+                    "Este correo debe iniciar sesión mediante contraseña.");
         }
         if (usuario.getAuthProvider() != AuthProvider.LOCAL && usuario.getAuthProvider() != authProvider) {
             throw new RuntimeException("El email ya está vinculado a otro proveedor");
@@ -151,7 +154,9 @@ public class AuthService {
         usuario.setNombre(nombre != null && !nombre.isBlank() ? nombre : email);
         usuario.setAuthProvider(authProvider);
         usuario.setProviderUserId(providerUserId);
-        usuario.setRol(resolveRoleByEmail(email));
+        usuario.setRol(authProvider == AuthProvider.GOOGLE
+                ? RolUsuario.ROLE_PROFESOR
+                : resolveRoleByEmail(email));
         return usuarioRepository.save(usuario);
     }
 
