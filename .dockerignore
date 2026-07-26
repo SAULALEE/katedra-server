@@ -1,0 +1,7 @@
+target
+.git
+.katedra
+.claude
+docs
+*.md
+.doppler
