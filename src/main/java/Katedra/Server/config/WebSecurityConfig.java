@@ -15,6 +15,9 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -99,12 +102,31 @@ public class WebSecurityConfig {
                 && hasText(frontendSuccessUrl)
                 && hasText(frontendErrorUrl)) {
             http.oauth2Login(oauth -> oauth
+                    .authorizationEndpoint(endpoint -> endpoint
+                            .authorizationRequestResolver(authorizationRequestResolver(clientRegistrationRepository)))
                     .successHandler(successHandler)
                     .failureHandler(failureHandler)
             );
         }
 
         return http.build();
+    }
+
+    // Without prompt=select_account, Google/Microsoft silently reuse whatever
+    // session cookie is already in the browser and skip the account chooser —
+    // login and register (same /oauth2/authorization/{provider} endpoint, see
+    // OAuth2AuthenticationSuccessHandler#loginOrRegisterSocial) always land on
+    // the last-used account instead of letting the user pick.
+    private OAuth2AuthorizationRequestResolver authorizationRequestResolver(
+            ClientRegistrationRepository clientRegistrationRepository
+    ) {
+        DefaultOAuth2AuthorizationRequestResolver resolver = new DefaultOAuth2AuthorizationRequestResolver(
+                clientRegistrationRepository,
+                OAuth2AuthorizationRequestRedirectFilter.DEFAULT_AUTHORIZATION_REQUEST_BASE_URI
+        );
+        resolver.setAuthorizationRequestCustomizer(customizer ->
+                customizer.additionalParameters(params -> params.put("prompt", "select_account")));
+        return resolver;
     }
 
     @Bean
