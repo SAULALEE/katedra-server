@@ -14,7 +14,7 @@ public class PlanPublicoService {
             "10 generaciones de IA al día",
             "5 exportaciones al día",
             "Teoría y evaluaciones",
-            "Exportación a Word, PDF y Markdown");
+            "Exportación a Word y PDF");
 
     private static final List<String> PRO = List.of(
             "100 generaciones de IA al día",
@@ -22,7 +22,7 @@ public class PlanPublicoService {
             "Modelo Catedrático",
             "Generación de diapositivas",
             "Temarios desde PDF o enlace web",
-            "Todos los formatos de exportación");
+            "Exportación a Markdown y Google Forms");
 
     private final StripeService stripeService;
 

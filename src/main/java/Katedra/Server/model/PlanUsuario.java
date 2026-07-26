@@ -20,14 +20,14 @@ import com.fasterxml.jackson.annotation.JsonValue;
  */
 public enum PlanUsuario {
     /** ~2-3 complete syllabi per day, manual entry only, Tutor model only. */
-    FREE("free", "Gratis", 10, 5, false, false, false, false),
+    FREE("free", "Gratis", 10, 5, false, false, false, false, false),
     /**
      * Everything unlocked. 100 pieces/day is not a paywall, it is an abuse ceiling:
      * every piece is a real OpenAI call, and an uncapped reasoning model at this price
      * point is a margin risk. At ~4 pieces per syllabus this is ~25 syllabi a day, far
      * beyond any real teaching workload.
      */
-    PRO("pro", "Pro", 100, 100, true, true, true, true);
+    PRO("pro", "Pro", 100, 100, true, true, true, true, true);
 
     private final String valor;
     private final String etiqueta;
@@ -37,10 +37,12 @@ public enum PlanUsuario {
     private final boolean permiteDiapositivas;
     private final boolean permiteCargaArchivo;
     private final boolean permiteCargaUrl;
+    private final boolean permiteExportacionAvanzada;
 
     PlanUsuario(String valor, String etiqueta, int generacionesPorDia, int exportacionesPorDia,
                 boolean permiteModeloPro, boolean permiteDiapositivas,
-                boolean permiteCargaArchivo, boolean permiteCargaUrl) {
+                boolean permiteCargaArchivo, boolean permiteCargaUrl,
+                boolean permiteExportacionAvanzada) {
         this.valor = valor;
         this.etiqueta = etiqueta;
         this.generacionesPorDia = generacionesPorDia;
@@ -49,6 +51,7 @@ public enum PlanUsuario {
         this.permiteDiapositivas = permiteDiapositivas;
         this.permiteCargaArchivo = permiteCargaArchivo;
         this.permiteCargaUrl = permiteCargaUrl;
+        this.permiteExportacionAvanzada = permiteExportacionAvanzada;
     }
 
     @JsonValue
@@ -89,6 +92,11 @@ public enum PlanUsuario {
     /** Whether a syllabus may be created from a web URL. */
     public boolean permiteCargaUrl() {
         return permiteCargaUrl;
+    }
+
+    /** Whether {@link FormatoExportacion#MARKDOWN} and {@link FormatoExportacion#APPS_SCRIPT} may be exported. */
+    public boolean permiteExportacionAvanzada() {
+        return permiteExportacionAvanzada;
     }
 
     @JsonCreator

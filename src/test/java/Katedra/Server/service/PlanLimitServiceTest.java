@@ -113,6 +113,12 @@ class PlanLimitServiceTest {
         assertThatCode(() -> planLimitService.validarExportacion(
                 pro, PiezaMaterial.DIAPOSITIVAS, FormatoExportacion.PPTX))
                 .doesNotThrowAnyException();
+        assertThatCode(() -> planLimitService.validarExportacion(
+                pro, PiezaMaterial.TEORIA, FormatoExportacion.MARKDOWN))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> planLimitService.validarExportacion(
+                pro, PiezaMaterial.EVALUACION, FormatoExportacion.APPS_SCRIPT))
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -158,6 +164,26 @@ class PlanLimitServiceTest {
                 free, PiezaMaterial.TEORIA, FormatoExportacion.PDF)).doesNotThrowAnyException();
         assertThatCode(() -> planLimitService.validarExportacion(
                 free, PiezaMaterial.TEORIA, FormatoExportacion.DOCX)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("FREE cannot export to Markdown")
+    void freeNoPuedeExportarMarkdown() {
+        ResponseStatusException ex = capturar(
+                () -> planLimitService.validarExportacion(free, PiezaMaterial.TEORIA, FormatoExportacion.MARKDOWN));
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(ex.getReason()).contains("Markdown");
+    }
+
+    @Test
+    @DisplayName("FREE cannot export to Google Forms (Apps Script)")
+    void freeNoPuedeExportarAppsScript() {
+        ResponseStatusException ex = capturar(
+                () -> planLimitService.validarExportacion(free, PiezaMaterial.EVALUACION, FormatoExportacion.APPS_SCRIPT));
+
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(ex.getReason()).contains("Google Forms");
     }
 
     @Test
@@ -276,6 +302,7 @@ class PlanLimitServiceTest {
         assertThat(uso.permiteDiapositivas()).isFalse();
         assertThat(uso.permiteCargaArchivo()).isFalse();
         assertThat(uso.permiteCargaUrl()).isFalse();
+        assertThat(uso.permiteExportacionAvanzada()).isFalse();
     }
 
     @Test

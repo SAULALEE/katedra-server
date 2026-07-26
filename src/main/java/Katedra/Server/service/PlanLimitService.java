@@ -84,10 +84,11 @@ public class PlanLimitService {
     /**
      * Rejects an export format the tier does not include.
      *
-     * <p>Currently every format a FREE user can reach is allowed, because the only
-     * PRO-exclusive format (PPTX) exists solely for DIAPOSITIVAS, which FREE cannot
-     * generate in the first place. The check is still routed through here so the rule has
-     * one home if that ever stops being true.
+     * <p>PPTX is gated by {@link PlanUsuario#permiteDiapositivas()} since it exists solely
+     * for DIAPOSITIVAS, which FREE cannot generate in the first place. MARKDOWN and
+     * APPS_SCRIPT (Google Forms) are gated separately by
+     * {@link PlanUsuario#permiteExportacionAvanzada()}: FREE keeps PDF/DOCX so a syllabus
+     * is always usable, but the more workflow-oriented formats are a Pro upsell.
      */
     public void validarExportacion(Usuario usuario, PiezaMaterial pieza, FormatoExportacion formato) {
         PlanUsuario plan = planDe(usuario);
@@ -95,6 +96,13 @@ public class PlanLimitService {
         if (formato == FormatoExportacion.PPTX && !plan.permiteDiapositivas()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "Exportar a PPTX es exclusivo del plan Pro. Mejora tu plan para usarlo.");
+        }
+
+        if ((formato == FormatoExportacion.MARKDOWN || formato == FormatoExportacion.APPS_SCRIPT)
+                && !plan.permiteExportacionAvanzada()) {
+            String nombreFormato = formato == FormatoExportacion.APPS_SCRIPT ? "Google Forms" : "Markdown";
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Exportar a " + nombreFormato + " es exclusivo del plan Pro. Mejora tu plan para usarlo.");
         }
     }
 
@@ -186,7 +194,8 @@ public class PlanLimitService {
                 plan.permiteModeloPro(),
                 plan.permiteDiapositivas(),
                 plan.permiteCargaArchivo(),
-                plan.permiteCargaUrl());
+                plan.permiteCargaUrl(),
+                plan.permiteExportacionAvanzada());
     }
 
     /** Null-safe: a user row written before V23 could in principle carry no plan. */

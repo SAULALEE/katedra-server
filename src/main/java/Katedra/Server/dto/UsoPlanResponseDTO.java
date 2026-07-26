@@ -22,5 +22,6 @@ public record UsoPlanResponseDTO(
         boolean permiteModeloPro,
         boolean permiteDiapositivas,
         boolean permiteCargaArchivo,
-        boolean permiteCargaUrl) {
+        boolean permiteCargaUrl,
+        boolean permiteExportacionAvanzada) {
 }

@@ -26,6 +26,7 @@ class PlanUsuarioTest {
         assertThat(free.permiteDiapositivas()).isFalse();
         assertThat(free.permiteCargaArchivo()).isFalse();
         assertThat(free.permiteCargaUrl()).isFalse();
+        assertThat(free.permiteExportacionAvanzada()).isFalse();
     }
 
     @Test
@@ -39,6 +40,7 @@ class PlanUsuarioTest {
         assertThat(pro.permiteDiapositivas()).isTrue();
         assertThat(pro.permiteCargaArchivo()).isTrue();
         assertThat(pro.permiteCargaUrl()).isTrue();
+        assertThat(pro.permiteExportacionAvanzada()).isTrue();
     }
 
     @Test
