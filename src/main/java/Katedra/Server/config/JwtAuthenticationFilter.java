@@ -9,9 +9,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
@@ -19,6 +20,8 @@ import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Optional;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -26,13 +29,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final int SC_PRECONDITION_REQUIRED = 428;
 
     private final JwtService jwtService;
-    private final UserDetailsService userDetailsService;
     private final UsuarioRepository usuarioRepository;
     private final SecurityContextRepository securityContextRepository = new RequestAttributeSecurityContextRepository();
 
-    public JwtAuthenticationFilter(JwtService jwtService, UserDetailsService userDetailsService, UsuarioRepository usuarioRepository) {
+    public JwtAuthenticationFilter(JwtService jwtService, UsuarioRepository usuarioRepository) {
         this.jwtService = jwtService;
-        this.userDetailsService = userDetailsService;
         this.usuarioRepository = usuarioRepository;
     }
 
@@ -60,9 +61,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+            Optional<Usuario> usuario = usuarioRepository.findByEmail(userEmail);
 
-            if (jwtService.isTokenValid(jwt, userEmail)) {
+            // The token's signature already proves identity, so the password-gated
+            // userDetailsService (which rejects social-login accounts with no local
+            // password) has no business in this path: it would 500 every request
+            // from a Google/Microsoft-authenticated user.
+            if (usuario.isPresent() && jwtService.isTokenValid(jwt, userEmail)) {
+                UserDetails userDetails = toUserDetails(usuario.get());
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         userDetails,
                         null,
@@ -72,7 +78,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(authToken);
                 this.securityContextRepository.saveContext(SecurityContextHolder.getContext(), request, response);
 
-                if (!isPasswordChangeRequest(request) && requiresPasswordChange(userEmail)) {
+                if (!isPasswordChangeRequest(request) && usuario.get().isMustChangePassword()) {
                     response.setStatus(SC_PRECONDITION_REQUIRED);
                     response.setContentType("application/json");
                     response.setCharacterEncoding("UTF-8");
@@ -84,10 +90,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private boolean requiresPasswordChange(String userEmail) {
-        return usuarioRepository.findByEmail(userEmail)
-                .map(Usuario::isMustChangePassword)
-                .orElse(false);
+    private UserDetails toUserDetails(Usuario usuario) {
+        return new User(
+                usuario.getEmail(),
+                usuario.getPassword() == null ? "" : usuario.getPassword(),
+                List.of(new SimpleGrantedAuthority(usuario.getRol().name()))
+        );
     }
 
     private boolean isPasswordChangeRequest(HttpServletRequest request) {
