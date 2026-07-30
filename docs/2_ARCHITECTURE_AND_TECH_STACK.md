@@ -1,29 +1,110 @@
-# Arquitectura y Stack Tecnológico
+# Architecture and Tech Stack
 
-## 1. Tecnologías Principales
-El backend de Katedra está construido con tecnologías modernas y de nivel empresarial:
-- **Lenguaje:** Java 21
-- **Framework:** Spring Boot 3.x
-- **Base de Datos:** MySQL 8.0
-- **Migraciones de Base de Datos:** Flyway
-- **Gestión de Secretos:** Doppler
+## 1. Stack
 
-## 2. Paradigma Arquitectónico
-Katedra emplea una arquitectura de **Monolito Modular por Capas**. Este patrón proporciona el equilibrio perfecto entre la velocidad de desarrollo para un equipo de un solo desarrollador y el rigor estructural requerido para el escalado futuro.
+| Concern | Choice |
+|---|---|
+| Language | Java 21 |
+| Framework | Spring Boot 4.0.6 |
+| AI integration | Spring AI (`ChatClient`) over OpenAI |
+| Database | MySQL 8.0 |
+| Migrations | Flyway |
+| Payments | Stripe Subscriptions (Java SDK) |
+| Secrets | Doppler in development; plain environment variables in production |
+| Auth | Spring Security, stateless JWT, optional Google / Microsoft OAuth2 |
+| Tests | JUnit 5, Mockito, AssertJ, `@WebMvcTest` |
+| Container | Multi-stage Dockerfile on Eclipse Temurin 21, runs as a non-root user |
 
-### 2.1 Flujo de Datos y Límites
-El sistema impone estrictamente la separación de responsabilidades a través de las siguientes capas:
-1. **Controladores REST:** Responsables únicamente de manejar las peticiones HTTP, el formato de las respuestas y los códigos de estado. Interactúan exclusivamente con Objetos de Transferencia de Datos (DTOs).
-2. **Capa de Servicio (Service):** Aloja la lógica de negocio central. Responsable del mapeo entre Entidades (representación de base de datos) y DTOs (representación de API).
-3. **Capa de Repositorio (Repository):** Interfaces de Spring Data JPA que manejan las consultas a la base de datos. No reside ninguna lógica de negocio aquí.
-4. **Entidades de Dominio (Entities):** Entidades JPA que se mapean directamente a las tablas de MySQL. Las entidades nunca se filtran a la capa del Controlador.
+## 2. Architecture
 
-## 3. Principios de Diseño de Base de Datos
-- **Claves Primarias:** Uso global de UUIDs (`CHAR(36)`) por seguridad y capacidades de generación distribuida.
-- **Borrado Lógico (Soft Deletes):** La eliminación directa está prohibida. Todas las entidades de dominio utilizan una bandera de marca de tiempo `deleted_at` y anotaciones `@SQLDelete` / `@Where` en JPA para garantizar la retención de datos.
-- **Migraciones:** Los cambios de esquema se gestionan estrictamente a través de Flyway (`V[Version]__[Description].sql`), asegurando despliegues consistentes.
-- **Convenciones de Nomenclatura:** `snake_case` en MySQL, `camelCase` en Java.
+Katedra is a **layered modular monolith**. For a one-developer project this gives the structural
+discipline of service boundaries without the operational cost of running several services — one
+deployable, one database, one transaction boundary.
 
-## 4. Seguridad
-- **JWT sin Estado:** La autenticación se maneja a través de JSON Web Tokens, validados por un filtro personalizado `JwtAuthenticationFilter` integrado con Spring Security.
-- **Aislamiento de Entornos:** Las configuraciones sensibles (ej., `DB_PASSWORD`, `JWT_SECRET`) se inyectan dinámicamente a través de Doppler en tiempo de ejecución, evitando la filtración de credenciales en el repositorio.
+### 2.1 Layers
+
+```
+REST Controller  ──  DTO  ──  Service  ──  Entity  ──  Repository  ──  MySQL
+                                 │
+                                 └──  ChatClient (Spring AI)  ──  OpenAI
+```
+
+Enforced boundaries:
+
+1. **Controllers** handle HTTP only — routing, status codes, validation entry. They accept and
+   return DTOs, never entities.
+2. **Services** hold business logic, AI orchestration, and Entity↔DTO mapping.
+3. **Repositories** are Spring Data JPA interfaces. No business logic.
+4. **Entities** map to MySQL tables and never leave the service layer.
+
+Errors are handled centrally by a `@RestControllerAdvice` global exception handler, so controllers
+contain no error-mapping code.
+
+### 2.2 Request surface
+
+Eight controllers: authentication, syllabi (`temarios`), subjects (`asignaturas`), content
+generation, exports, subscriptions, users, and the Stripe webhook. All routes sit under the
+`/api/v1` context path.
+
+## 3. AI integration
+
+- **Spring AI `ChatClient`** abstracts the provider. Nothing in the codebase calls the OpenAI SDK
+  directly, so switching provider is a configuration change.
+- **Async by default.** Generation runs on `@Async` methods returning `CompletableFuture`, on a
+  dedicated `ai-` thread pool. The reasoning tier routinely takes 30–90 seconds, so Spring MVC's
+  async request timeout is raised to 180s — the 30s default was silently returning 503 before the
+  model had finished.
+- **Prompts are content, not code.** Every system prompt lives in
+  `src/main/resources/prompts/*.st` and is rendered through Spring AI's `PromptTemplate`.
+  `PromptTemplates` is the only class that touches those files; prompt text is never inlined into
+  `.java`.
+- **Response format follows the content.** Prose (theory) comes back as plain markdown. Inherently
+  structured content (exams, slides) uses OpenAI Structured Outputs via `.entity(...)`, so there
+  is no hand-rolled JSON parsing.
+- **Per-tier call options.** There is deliberately no global `spring.ai.openai.chat.options`
+  default: a global default gets merged into every call, which is how `temperature` and
+  `max_tokens` previously leaked into reasoning-model requests that reject them. Each call sets a
+  complete, tier-specific options object instead.
+
+## 4. Database design
+
+- **UUID primary keys** stored as `CHAR(36)`, generated by Hibernate's `@UuidGenerator`.
+- **Soft deletes.** Hard deletes are forbidden for domain entities; each table carries a nullable
+  `deleted_at` and the entity uses `@SQLDelete` + a `deleted_at IS NULL` filter. The `suscripcion`
+  table is a deliberate exception — it is a billing history log, so its rows are never deleted.
+- **Lazy fetching** by default on all relationships, to avoid N+1 queries.
+- **Flyway only.** Every schema change is a `V[Version]__[Description].sql` migration; there are
+  no manual database interventions and `ddl-auto` is set to `validate`, so the application refuses
+  to start if the schema and the entities disagree.
+- **Naming.** `snake_case` in MySQL, `camelCase` in Java. Domain vocabulary stays Spanish
+  (`temario`, `asignatura`, `suscripcion`) because that is the language of the problem domain.
+
+## 5. Billing and quota enforcement
+
+Plan limits are enforced at three choke points, all in `PlanLimitService`, and all reading the
+plan **from the database** rather than from the JWT:
+
+1. **Capability check → 403.** Runs before any I/O: is this tier allowed to use the Catedrático
+   model, generate slides, upload a file, import a URL, or use an advanced export format?
+2. **Quota reservation → 429.** Runs last before committing to the async AI pipeline, in a
+   `REQUIRES_NEW` transaction against a `UNIQUE(usuario_id, fecha)` daily-usage row.
+3. **Quota refund.** If pieces fail during generation, the reserved count is released back.
+
+The JWT carries a `plan` claim, but only so the UI can paint the plan badge immediately. Because a
+token lives an hour and a plan can change mid-session, every actual gate re-reads the database.
+
+## 6. Security
+
+- **Stateless JWT** validated by a custom `JwtAuthenticationFilter` ahead of the controllers. CSRF
+  is disabled because there is no session and no cookie-borne credential.
+- **CORS allow-list** via `app.cors.allowed-origins`. It defaults to the Vite dev server for local
+  work, and production **must** override it — the prod profile has no default.
+- **Fail-fast production config.** `application-prod.properties` declares `DB_*`, `JWT_SECRET` and
+  `CORS_ALLOWED_ORIGINS` with no fallback values, so a missing secret stops the application from
+  starting instead of silently running on a development default.
+- **Stripe webhook signatures** are verified against the raw request body before the payload is
+  deserialised.
+- **Input validation** at the controller boundary with Jakarta Validation annotations on DTO
+  records.
+- **Error bodies** expose hand-written validation messages only; stack traces are never included.
+- **Ownership checks** in the service layer: a user can only reach their own syllabi and material.
