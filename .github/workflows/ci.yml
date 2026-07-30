@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      # No database service is needed: src/test/resources/application.properties points the
+      # suite at an in-memory H2 database with Flyway disabled, so the tests are self-contained.
+      - name: Run tests
+        run: ./mvnw -B test
+
+      - name: Verify the application packages
+        run: ./mvnw -B -DskipTests package
