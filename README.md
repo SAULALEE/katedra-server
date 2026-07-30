@@ -1,115 +1,162 @@
 # Katedra Server
 
-Este repositorio contiene el backend de **Katedra**, una herramienta de generación de contenido académico impulsada por Inteligencia Artificial para profesores. La aplicación está desarrollada utilizando Spring Boot y una arquitectura de monolito modular.
+[![CI](https://github.com/SAULALEE/katedra-server/actions/workflows/ci.yml/badge.svg)](https://github.com/SAULALEE/katedra-server/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+Backend for **Katedra**, an AI-driven academic content generator for teachers. Give it a
+syllabus — typed, uploaded, or from a URL — and it generates the outline, theory, an exam,
+and slides, using real OpenAI calls through Spring AI. Spring Boot 4, Java 21, MySQL 8,
+Stripe billing.
+
+Spanish version: [README.es.md](README.es.md) · Frontend: [katedra-client](https://github.com/SAULALEE/katedra-client)
 
 ---
 
-## Requisitos Previos e Instalación
+## Live demo
 
-Asegúrate de tener instalado lo siguiente en tu máquina local:
+- **App:** https://katedra-client.vercel.app
+- **API:** https://katedra-server.onrender.com/api/v1
 
-### 1. Java 21 (JDK 21)
-El entorno de desarrollo para ejecutar la aplicación. Se recomienda usar [SDKMAN!](https://sdkman.io/) para la gestión de versiones de Java:
-```bash
-sdk install java 21-open
-```
+> **Demo credentials:** not published yet — see [Demo accounts](#demo-accounts) below.
+> The API is hosted on Render's free tier, so the first request after a period of
+> inactivity can take up to a minute to wake it up.
 
-### 2. MySQL 8.0
-Motor de base de datos relacional para el almacenamiento persistente. Debe estar en ejecución localmente o en un contenedor accesible.
+### Demo accounts
 
-### 3. Doppler CLI
-Cliente para inyectar variables de entorno de forma segura sin usar archivos locales `.env` o contraseñas expuestas en texto plano.
-
-#### 🐧 En Linux (Debian/Ubuntu/macOS)
-Puedes utilizar el instalador rápido oficial:
-```bash
-curl -sLf https://web.doppler.com/install.sh | sh
-```
-*O vía Homebrew:*
-```bash
-brew install dopplerhq/cli/doppler
-```
-
-#### 🪟 En Windows
-Puedes instalarlo mediante gestores de paquetes comunes de Windows:
-
-**Opción A: Winget (Recomendado)**
-```powershell
-winget install Doppler.DopplerCLI
-```
-
-**Opción B: Scoop**
-```powershell
-scoop bucket add doppler https://github.com/DopplerHQ/scoop-bucket.git
-scoop install doppler
-```
+Any email ending in `@katedra.com` self-registers as an admin (`AuthService.resolveRoleByEmail`);
+any other email registers as a regular teacher account on the Free plan. Register your own
+account at `/auth/register` to try the app immediately — a public seeded demo account with a
+Free and a Pro login is planned but not live yet.
 
 ---
 
-## 🚀 Configuración del Entorno Local
+## Architecture
 
-Una vez completadas las instalaciones del sistema, sigue estos pasos:
+```mermaid
+flowchart LR
+    Client["katedra-client (React)"] -->|REST /api/v1| Controller
+    subgraph Server["katedra-server (Spring Boot)"]
+        Controller["Controllers\n(DTOs only)"] --> Service["Services\n(business logic)"]
+        Service --> Repo["Repositories\n(Spring Data JPA)"]
+        Service --> AI["Spring AI ChatClient"]
+        Service --> Stripe["Stripe SDK"]
+    end
+    Repo --> DB[(MySQL 8)]
+    AI --> OpenAI[("OpenAI\ngpt-4.1-mini / o4-mini")]
+    Stripe --> StripeAPI[("Stripe API")]
+```
 
-### 1. Clonar el repositorio
+A layered modular monolith: controllers only see DTOs, entities never leave the service
+layer, all AI and Stripe calls are async. Details in
+[docs/2_ARCHITECTURE_AND_TECH_STACK.md](docs/2_ARCHITECTURE_AND_TECH_STACK.md).
+
+---
+
+## Tech stack
+
+| | |
+|---|---|
+| Language / framework | Java 21, Spring Boot 4.0.6 |
+| AI | Spring AI `ChatClient` → OpenAI (`gpt-4.1-mini` / `o4-mini`) |
+| Database | MySQL 8.0, Flyway migrations |
+| Auth | Stateless JWT, optional Google/Microsoft OAuth2 |
+| Billing | Stripe Subscriptions |
+| Tests | JUnit 5, Mockito, AssertJ, `@WebMvcTest` — 336 tests |
+| API docs | springdoc (live from the code) + a Bruno collection |
+| Container | Multi-stage Dockerfile, non-root user |
+
+Full picture: [docs/1_PROJECT_OVERVIEW.md](docs/1_PROJECT_OVERVIEW.md) ·
+[docs/3_STATUS_AND_ROADMAP.md](docs/3_STATUS_AND_ROADMAP.md).
+
+---
+
+## Quickstart (no Doppler account needed)
+
+Requires Docker.
+
 ```bash
-git clone <url-del-repositorio>
+git clone https://github.com/SAULALEE/katedra-server.git
 cd katedra-server
+cp .env.example .env
+# edit .env and set OPENAI_API_KEY to generate real content — everything else has a working default
+docker compose up -d
 ```
 
-### 2. Autenticar y enlazar Doppler
-Debes conectarse a Doppler y enlazar este directorio local al proyecto de la aplicación:
+The API is now at `http://localhost:8080/api/v1`. Confirm it's up:
 
 ```bash
-# Iniciar sesión en Doppler (solo la primera vez)
-doppler login
-
-# Enlazar la carpeta local al proyecto
-doppler setup
+curl http://localhost:8080/api/v1/auth/register -X POST -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com","password":"Test1234!","nombre":"Your Name"}'
 ```
-> [!NOTE]
-> Cuando ejecutes `doppler setup`, selecciona el proyecto **`katedra-server`** y la configuración de entorno **`dev`** (o tu configuración de desarrollo asignada).
 
-### 3. Ejecutar el servidor de desarrollo
-Para iniciar la aplicación local inyectando los secretos de Doppler de forma automática:
+Stripe is optional for everything except `GET /suscripciones/planes` (the public pricing
+list) — that endpoint calls Stripe unconditionally and needs `STRIPE_PRICE_PRO_MENSUAL` /
+`STRIPE_PRICE_PRO_ANUAL` set to respond. Everything else works with billing left blank.
+
+### Running without Docker
+
+Java 21 and a local MySQL 8 are enough — every property in `application.properties` has a
+local-development default, so the app starts against `localhost:3306/katedra_dev` with no
+configuration at all:
+
+```bash
+./mvnw spring-boot:run
+```
+
+Contributors with access to the project's Doppler org can skip `.env` entirely:
 
 ```bash
 doppler run -- ./mvnw spring-boot:run
 ```
 
-El servidor de desarrollo correrá por defecto en `http://localhost:8080/api/v1`.
+---
+
+## Tests
+
+```bash
+./mvnw test
+```
+
+336 tests — JUnit 5, Mockito, AssertJ, `@WebMvcTest` slices — run against an in-memory H2
+database with Flyway disabled, so no external service is required. CI runs this on every
+push to `main` and `staging`.
 
 ---
 
-## 📦 Comandos y Tareas Disponibles
+## API documentation
 
-El proyecto expone las siguientes tareas de Maven a través del wrapper (`mvnw`):
+Two sources, always in sync with each other because both come from the same running code:
 
-- **`doppler run -- ./mvnw spring-boot:run`**: Levanta el entorno de desarrollo de Spring Boot inyectando las variables de entorno desde Doppler.
-- **`./mvnw clean package`**: Compila el proyecto y genera el archivo JAR empaquetado y optimizado en el directorio `target/`.
-- **`doppler run -- ./mvnw test`**: Ejecuta la suite de pruebas unitarias e integración con las variables correspondientes.
-
----
-
-##  Documentación de API (APIdog / OpenAPI 3.0)
-
-Este backend expone una especificación completa de la API REST bajo el estándar OpenAPI 3.0 en el archivo [openapi.yaml](openapi.yaml) ubicado en la raíz de este proyecto.
-
-Para importar e interactuar con la API en **APIdog**:
-1. Abre **APIdog** y crea o selecciona tu espacio de trabajo.
-2. Haz clic en **Project Settings** (Configuración del proyecto) -> **Import**.
-3. Selecciona la pestaña **OpenAPI / Swagger**.
-4. Sube o arrastra el archivo `openapi.yaml`.
-5. Confirma la importación. APIdog creará automáticamente la colección de peticiones REST, los esquemas de datos (DTOs) y habilitará mocks interactivos para pruebas locales.
+- **Swagger UI** — start the app, open `http://localhost:8080/api/v1/swagger-ui/index.html`.
+  Generated live from the controllers (springdoc), so it cannot drift from the code the way a
+  hand-written spec can. Raw spec at `/api/v1/v3/api-docs`.
+- **[Bruno collection](api/bruno/)** — 37 requests, one per endpoint, with a `Local` and a
+  `Production` environment and a suggested run order. Free, offline, plain-text — open
+  `api/bruno/` as a collection in [Bruno](https://www.usebruno.com/).
 
 ---
 
-##  Gestión de Variables de Entorno
+## Project structure
 
-* **No crear archivos locales de configuración con credenciales:** El archivo `application.properties` lee directamente del entorno mediante variables como `${DB_URL}` o `${JWT_SECRET}`. Doppler se encarga de inyectar las variables directamente en el proceso de ejecución.
-* **Variables esenciales para desarrollo:**
-  - `DB_URL`: URL de conexión a la base de datos MySQL (ej. `jdbc:mysql://localhost:3306/katedra_db`).
-  - `DB_USER`: Nombre de usuario de la base de datos.
-  - `DB_PASSWORD`: Contraseña del usuario de la base de datos.
-  - `JWT_SECRET`: Clave secreta para la firma y verificación de JSON Web Tokens (JWT).
-  - `JWT_EXPIRATION`: Tiempo de vida de los tokens en milisegundos.
-* **Agregar nuevos secretos:** Si necesitas registrar una nueva variable (por ejemplo, `OPENAI_API_KEY`), agrégala en la plataforma de Doppler para el proyecto `katedra-server` en el entorno respectivo y notifica al equipo para sincronizar los cambios.
+```
+src/main/java/Katedra/Server/
+  controller/   REST endpoints — DTOs in, DTOs out
+  service/      business logic, AI orchestration, Stripe orchestration
+  repository/   Spring Data JPA interfaces
+  model/        JPA entities and domain enums
+  dto/          request/response records
+  config/       security, CORS, OpenAPI, OAuth2, Stripe wiring
+src/main/resources/
+  db/migration/ Flyway scripts
+  prompts/      AI system prompts (content, not code — never inlined in .java)
+api/bruno/      the Bruno API collection
+docs/           architecture and roadmap docs
+```
+
+---
+
+## Roadmap
+
+See [docs/3_STATUS_AND_ROADMAP.md](docs/3_STATUS_AND_ROADMAP.md) for what's shipped and
+what's next — briefly: Stripe live mode, demo-account rate limiting, integration tests
+against a real database, and deeper slide generation.
