@@ -36,3 +36,8 @@ build/
 .doppler
 .doppler/
 *.log
+
+# Local environment files. `.env.example` is the committed template and must stay tracked.
+.env
+.env.*
+!.env.example

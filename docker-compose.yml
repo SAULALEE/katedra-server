@@ -1,0 +1,89 @@
+# Local Katedra stack: MySQL + the API.
+#
+#   cp .env.example .env      # then fill in OPENAI_API_KEY to enable generation
+#   docker compose up -d      # database + API  -> http://localhost:8080/api/v1
+#
+# To run only the database and start the API from your IDE or ./mvnw instead:
+#
+#   docker compose up -d mysql
+#
+# Every value below falls back to a local-development default, so `docker compose up -d`
+# works on a fresh clone even before you create a .env file.
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: katedra_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_local}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-katedra_dev}
+      MYSQL_USER: ${DB_USER:-katedra_dev}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-katedra_local}
+    ports:
+      - "3306:3306"
+    volumes:
+      - katedra_data:/var/lib/mysql
+    networks:
+      - katedra_network
+    healthcheck:
+      # The API's depends_on waits on this, so it must prove the server accepts
+      # authenticated connections, not merely that the process is up.
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_local}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  server:
+    build: .
+    container_name: katedra_server
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      # Host is `mysql`, not localhost: inside the compose network the database is
+      # reached by service name. This is why DB_URL is set here rather than inherited
+      # from .env, where it points at localhost for host-run development.
+      DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-katedra_dev}
+      DB_USER: ${DB_USER:-katedra_dev}
+      DB_PASSWORD: ${DB_PASSWORD:-katedra_local}
+
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret-replace-me-32-chars-min}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
+
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+
+      # Required for content generation. Unset means the app runs but every
+      # generation request fails.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
+      # Optional. Unset disables social sign-in; the app still starts cleanly.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      FRONTEND_OAUTH_SUCCESS_URL: ${FRONTEND_OAUTH_SUCCESS_URL:-}
+      FRONTEND_OAUTH_ERROR_URL: ${FRONTEND_OAUTH_ERROR_URL:-}
+
+      # Optional for the app as a whole (unset means billing is inert and every
+      # account stays on Free), but GET /suscripciones/planes calls Stripe
+      # unconditionally and 500s without these — that includes the landing
+      # page's public pricing table.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_PRO_MENSUAL: ${STRIPE_PRICE_PRO_MENSUAL:-}
+      STRIPE_PRICE_PRO_ANUAL: ${STRIPE_PRICE_PRO_ANUAL:-}
+    ports:
+      - "${PORT:-8080}:8080"
+    networks:
+      - katedra_network
+
+networks:
+  katedra_network:
+    driver: bridge
+
+volumes:
+  katedra_data:
