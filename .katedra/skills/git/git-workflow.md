@@ -43,6 +43,11 @@ description: Git and branching workflow for server development
     | `style` | Formatting, indentation, structure | `style: fix import organization` |
 - **Explicit Push Authorization:**
   - The AI agent must **never** run `git push` or upload any code/commits to the remote repository unless the human user has explicitly requested it in the chat interface.
+- **No AI as Commit Author or Co-Author:**
+  - AI agents (Claude, Codex, Antigravity, or any other) must **never** appear as the author, committer, or co-author of any commit in this repository, in any form.
+  - This means: no `Co-Authored-By:` trailer naming an AI or an AI vendor (including Anthropic, OpenAI, or any other), no AI identity in the `Author:`/`Committer:` git fields, and no AI attribution anywhere in the commit message body.
+  - Every commit is authored solely by the human maintainer. This applies regardless of how much of the change an AI agent produced.
+  - If an AI agent creates a commit on the human's behalf, it must use the human's configured git identity only, with a plain commit message following the `<type>: <summary>` format above — no attribution footer of any kind.
 
 ## 3. STANDARD OPERATING PROCEDURE (π_σ)
 1. **Alignment:** Identify which feature branch matches the requested task (e.g., login changes belong in `feature/auth`).
