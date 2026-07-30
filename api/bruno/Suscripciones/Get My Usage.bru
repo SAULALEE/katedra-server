@@ -1,0 +1,22 @@
+meta {
+  name: Get My Usage
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/suscripciones/me/uso
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+docs {
+  Everything the sidebar usage meter needs in one call: plan, today's counts, and
+  capability flags (permiteModeloPro, permiteDiapositivas, permiteCargaArchivo,
+  permiteCargaUrl). This is the authoritative plan read — always from the database,
+  never from the JWT claim.
+}

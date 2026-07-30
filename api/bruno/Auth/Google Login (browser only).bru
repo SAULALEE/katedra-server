@@ -1,0 +1,17 @@
+meta {
+  name: Google Login (browser only)
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/auth/google
+  body: none
+  auth: none
+}
+
+docs {
+  Returns a 302 to /oauth2/authorization/google. The OAuth2 dance that follows needs a real
+  browser session and a registered redirect URI, so this request is only useful to confirm
+  the redirect fires — it cannot complete a login from Bruno.
+}

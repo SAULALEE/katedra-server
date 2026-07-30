@@ -1,0 +1,20 @@
+meta {
+  name: Get My Subscription
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/suscripciones/me
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+docs {
+  Returns null/empty on a FREE account — Suscripcion rows only exist for accounts that have
+  ever started a checkout.
+}

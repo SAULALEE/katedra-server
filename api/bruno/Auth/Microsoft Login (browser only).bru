@@ -1,0 +1,16 @@
+meta {
+  name: Microsoft Login (browser only)
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/auth/microsoft
+  body: none
+  auth: none
+}
+
+docs {
+  Returns a 302 to /oauth2/authorization/microsoft. Same caveat as Google Login: needs a
+  real browser session to complete, this request only confirms the redirect fires.
+}

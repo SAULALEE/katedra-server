@@ -1,0 +1,35 @@
+meta {
+  name: Register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "demo@example.com",
+    "password": "ChangeMe123!",
+    "nombre": "Demo User"
+  }
+}
+
+script:post-response {
+  // Not run automatically after Register: log in with Login instead, which sets {{jwt}}
+  // for the rest of the collection. This request just shows how an account is created.
+}
+
+docs {
+  Any email ending in @katedra.com is auto-promoted to ROLE_ADMIN by
+  AuthService#resolveRoleByEmail. Every other email registers as ROLE_PROFESOR on
+  PlanUsuario.FREE. There is no way to set `plan` through this endpoint or any other —
+  it is only ever written by SuscripcionService from a live Stripe sync.
+}

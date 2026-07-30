@@ -1,0 +1,15 @@
+meta {
+  name: List Favorites
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/temarios/favoritos
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}

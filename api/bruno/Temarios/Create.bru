@@ -1,0 +1,39 @@
+meta {
+  name: Create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/temarios
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "titulo": "Introducción al Álgebra",
+    "descripcion": "Ecuaciones lineales, factorización y sistemas de ecuaciones",
+    "gradoAcademico": "bachillerato",
+    "asignaturaId": "{{asignaturaId}}",
+    "modeloGeneracion": "TUTOR",
+    "numeroModulos": null
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar("temarioId", res.body.id);
+  }
+}
+
+docs {
+  Creating a syllabus synchronously triggers ESTRUCTURA generation (a real OpenAI call), so
+  this request can take a few seconds. modeloGeneracion is TUTOR or CATEDRATICO
+  (ModeloGeneracion), mapping to the flash/pro ModeloIA tier.
+}

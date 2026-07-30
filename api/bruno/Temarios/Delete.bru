@@ -1,0 +1,20 @@
+meta {
+  name: Delete
+  type: http
+  seq: 14
+}
+
+delete {
+  url: {{baseUrl}}/temarios/{{temarioId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+docs {
+  Soft delete — sets deleted_at. The syllabus stops appearing in List Mine but the row and
+  its generated content are retained.
+}

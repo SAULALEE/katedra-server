@@ -1,0 +1,24 @@
+meta {
+  name: List Mine
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/temarios
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+params:query {
+  asignaturaId: ~{{asignaturaId}}
+}
+
+docs {
+  asignaturaId is optional — omit it (or leave the query param disabled, as here) to list
+  every syllabus the authenticated user owns.
+}

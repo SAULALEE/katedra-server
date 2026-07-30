@@ -1,0 +1,20 @@
+meta {
+  name: Get Fuente
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/temarios/{{temarioId}}/fuente
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+docs {
+  Returns the raw ingested source (extracted file/URL text) a syllabus was created from, if
+  any — manual entries have no source to show.
+}

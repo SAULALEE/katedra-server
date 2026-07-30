@@ -1,0 +1,37 @@
+meta {
+  name: Stripe Webhook (Stripe only)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/webhooks/stripe
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Stripe-Signature: t=0,v1=placeholder
+}
+
+body:json {
+  {
+    "id": "evt_example",
+    "type": "invoice.paid"
+  }
+}
+
+docs {
+  Not runnable from Bruno with a real result: the signature is verified against the exact
+  raw bytes Stripe sent, computed with STRIPE_WEBHOOK_SECRET. Any payload built here will
+  fail verification and get a 400 — which is itself the check PricingSecurityTest asserts
+  (webhookEsPublicoPeroExigeFirma).
+
+  To exercise this endpoint for real, use the Stripe CLI against a locally running server:
+    stripe listen --forward-to localhost:8080/api/v1/webhooks/stripe
+    stripe trigger invoice.paid
+
+  This request exists in the collection purely to document the contract: unauthenticated,
+  POST, raw-string body, Stripe-Signature header required.
+}

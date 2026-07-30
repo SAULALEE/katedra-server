@@ -1,0 +1,24 @@
+meta {
+  name: 2. Confirm Payment
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/suscripciones/{{suscripcionId}}/confirmar
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+docs {
+  Only a hint to re-read live state from Stripe — never taken as proof of payment. Calling
+  this before the card was actually confirmed with Stripe just re-syncs whatever Stripe's
+  current state is (still INCOMPLETA), so it is safe to call speculatively.
+
+  This is one of two ways the sync fires; the Stripe webhook is the other. Both call the
+  same idempotent syncSubscriptionFromStripe, so whichever arrives first wins.
+}

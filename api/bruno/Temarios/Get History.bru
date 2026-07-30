@@ -1,0 +1,20 @@
+meta {
+  name: Get History
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/temarios/historial
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+docs {
+  Read-only audit trail: created / edited / (un)favorited / material generated / deleted,
+  newest first. Nothing here can be removed by the caller.
+}

@@ -1,0 +1,46 @@
+meta {
+  name: Generate Material
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/temarios/{{temarioId}}/generar-material
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "piezas": ["teoria"],
+    "modelo": "flash"
+  }
+}
+
+docs {
+  Selective generation — every listed piece is (re)generated. Every call is a real,
+  billed OpenAI request and counts against the daily generation quota (PlanLimitService).
+
+  piezas: any of estructura, teoria, evaluacion, diapositivas.
+    - evaluacion requires teoria to already exist (or to be requested in the same call) —
+      exams are generated from the theory text, not the raw syllabus.
+    - diapositivas requires PlanUsuario#permiteDiapositivas (Pro).
+  modelo: flash (Tutor, gpt-4.1-mini) or pro (Catedrático, o4-mini reasoning, Pro-only via
+    PlanUsuario#permiteModeloPro).
+
+  Optional per-tier overrides, each validated against the selected tier's [min, max]:
+  numeroParrafos, numeroPreguntas, numeroDiapositivas, numeroModulos.
+
+  Example requesting a full exam grounded in fresh theory in one call:
+    {
+      "piezas": ["teoria", "evaluacion"],
+      "modelo": "flash",
+      "numeroParrafos": 8,
+      "numeroPreguntas": 5
+    }
+}

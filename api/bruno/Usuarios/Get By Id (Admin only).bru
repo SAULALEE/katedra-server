@@ -1,0 +1,15 @@
+meta {
+  name: Get By Id (Admin only)
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/usuarios/{{usuarioId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}

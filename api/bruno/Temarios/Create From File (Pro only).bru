@@ -1,0 +1,30 @@
+meta {
+  name: Create From File (Pro only)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/temarios/cargar/archivo
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+body:multipart-form {
+  file: @file(./sample-syllabus.pdf)
+  titulo: Álgebra desde un PDF
+  asignaturaId: {{asignaturaId}}
+  gradoAcademico: universitario
+  modeloGeneracion: TUTOR
+}
+
+docs {
+  Requires PlanUsuario#permiteCargaArchivo (Pro). A FREE account gets a 403 here.
+  Accepted formats: pdf, doc, docx, md. Replace the `file` path with a real document
+  before running this request — Bruno's @file() reference is resolved relative to
+  this collection's root.
+}

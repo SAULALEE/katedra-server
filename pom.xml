@@ -58,6 +58,14 @@
 		     Already reachable transitively through tika-parsers-standard-package, but a
 		     transitive dependency is not an API contract: declare it explicitly, pinned to
 		     the same version Tika resolves so both stay in sync. -->
+		<!-- Auto-generates the OpenAPI spec + Swagger UI from the controllers themselves,
+		     so the spec cannot silently drift the way the hand-written openapi.yaml did.
+		     3.0.x is springdoc's first line targeting Spring Framework 7 / Boot 4. -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>3.0.3</version>
+		</dependency>
 		<dependency>
 			<groupId>org.apache.poi</groupId>
 			<artifactId>poi-ooxml</artifactId>

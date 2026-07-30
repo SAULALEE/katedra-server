@@ -1,0 +1,30 @@
+meta {
+  name: Create From URL (Pro only)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/temarios/cargar/url
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "url": "https://en.wikipedia.org/wiki/Linear_algebra",
+    "titulo": "Álgebra lineal desde una página web",
+    "asignaturaId": "{{asignaturaId}}",
+    "gradoAcademico": "universitario",
+    "modeloGeneracion": "TUTOR"
+  }
+}
+
+docs {
+  Requires PlanUsuario#permiteCargaUrl (Pro). A FREE account gets a 403 here.
+}

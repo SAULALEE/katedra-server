@@ -1,0 +1,33 @@
+meta {
+  name: Create Admin (Admin only)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/usuarios
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nombre": "Second Admin",
+    "email": "second.admin@katedra.com"
+  }
+}
+
+docs {
+  Requires ROLE_ADMIN. Creates a ROLE_ADMIN account with a random temporary password,
+  returned once in the response body — it is never retrievable again. The created account
+  has mustChangePassword=true and must call Usuarios/Change My Password before it can be
+  used normally.
+
+  This is the only way to mint a second admin without going through the @katedra.com
+  self-registration path in Auth/Register.
+}

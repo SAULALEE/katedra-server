@@ -1,0 +1,29 @@
+meta {
+  name: Create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/asignaturas
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nombre": "Matemáticas",
+    "descripcion": "Álgebra y cálculo de nivel bachillerato"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar("asignaturaId", res.body.id);
+  }
+}

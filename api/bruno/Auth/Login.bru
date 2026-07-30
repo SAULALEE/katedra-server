@@ -1,0 +1,33 @@
+meta {
+  name: Login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "demo@example.com",
+    "password": "ChangeMe123!"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.token) {
+    bru.setVar("jwt", res.body.token);
+  }
+}
+
+docs {
+  Run this first. It writes {{jwt}} into the collection's runtime variables, which every
+  other authenticated request in this collection reads via `Authorization: Bearer {{jwt}}`.
+}

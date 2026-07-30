@@ -1,0 +1,30 @@
+meta {
+  name: Update (Admin only)
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/usuarios/{{usuarioId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "nombre": "Renamed User",
+    "email": "renamed.user@example.com",
+    "rol": "ROLE_PROFESOR"
+  }
+}
+
+docs {
+  rol accepts only ROLE_ADMIN or ROLE_PROFESOR. There is deliberately no `plan` field —
+  plan can only ever change through the Stripe sync (SuscripcionService), never through a
+  direct edit, admin or not.
+}

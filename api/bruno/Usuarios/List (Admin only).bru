@@ -1,0 +1,20 @@
+meta {
+  name: List (Admin only)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/usuarios
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+docs {
+  Requires ROLE_ADMIN. Log in with an account whose email ends in @katedra.com — see
+  Auth/Register.bru for how the role is assigned.
+}

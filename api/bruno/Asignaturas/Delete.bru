@@ -1,0 +1,15 @@
+meta {
+  name: Delete
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/asignaturas/{{asignaturaId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}

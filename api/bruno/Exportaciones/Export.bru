@@ -1,0 +1,34 @@
+meta {
+  name: Export
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/temarios/{{temarioId}}/exportaciones
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+params:query {
+  pieza: teoria
+  formato: pdf
+  theme: ~light
+}
+
+docs {
+  Returns the file as a binary attachment (Content-Disposition), not JSON — use Bruno's
+  "Send and Download" or check the response body in binary/preview mode.
+
+  pieza x formato compatibility (FormatoExportacion#soporta):
+    teoria       -> docx, pdf, md
+    evaluacion   -> docx, pdf, md, gs (Google Forms Apps Script)
+    diapositivas -> pptx, pdf
+
+  md and gs require PlanUsuario#permiteExportacionAvanzada (Pro). Everything else is
+  available on Free, gated only by the daily export quota.
+}

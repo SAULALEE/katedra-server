@@ -1,0 +1,22 @@
+meta {
+  name: Update Favorite
+  type: http
+  seq: 10
+}
+
+patch {
+  url: {{baseUrl}}/temarios/{{temarioId}}/favorito
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "favorito": true
+  }
+}

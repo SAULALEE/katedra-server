@@ -69,6 +69,13 @@ public class WebSecurityConfig {
                 .requestMatchers("/auth/**", "/api/v1/auth/**").permitAll()
                 .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                 .requestMatchers("/error").permitAll()
+                // springdoc-generated spec + Swagger UI. Read-only documentation of the API
+                // surface, not the surface itself — safe to expose without auth.
+                .requestMatchers(
+                        "/v3/api-docs/**", "/api/v1/v3/api-docs/**",
+                        "/swagger-ui/**", "/api/v1/swagger-ui/**",
+                        "/swagger-ui.html", "/api/v1/swagger-ui.html"
+                ).permitAll()
                 // Stripe carries no JWT. Authenticity is established by the webhook
                 // signature check in StripeService, not by this chain.
                 .requestMatchers("/webhooks/stripe", "/api/v1/webhooks/stripe").permitAll()

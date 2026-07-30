@@ -1,0 +1,25 @@
+meta {
+  name: Update
+  type: http
+  seq: 9
+}
+
+put {
+  url: {{baseUrl}}/temarios/{{temarioId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "titulo": "Introducción al Álgebra (revisado)",
+    "descripcion": "Ecuaciones lineales, factorización, sistemas de ecuaciones y matrices",
+    "gradoAcademico": "bachillerato",
+    "asignaturaId": "{{asignaturaId}}"
+  }
+}

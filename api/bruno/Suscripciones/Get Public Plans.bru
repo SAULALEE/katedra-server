@@ -1,0 +1,19 @@
+meta {
+  name: Get Public Plans
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/suscripciones/planes
+  body: none
+  auth: none
+}
+
+docs {
+  Public, no auth required — this is what the landing page's pricing table reads.
+
+  Verified: this call 500s if STRIPE_PRICE_PRO_MENSUAL/ANUAL aren't configured.
+  PlanPublicoService.listar() calls Stripe unconditionally for both cycles, so
+  the "Stripe is optional" claim elsewhere in this repo does not cover this endpoint.
+}

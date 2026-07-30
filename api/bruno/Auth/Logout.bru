@@ -1,0 +1,16 @@
+meta {
+  name: Logout
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/auth/logout
+  body: none
+  auth: none
+}
+
+docs {
+  JWT auth is stateless: there is no server-side session to invalidate. This endpoint only
+  gives the frontend a 204 to acknowledge logout; the token remains valid until it expires.
+}

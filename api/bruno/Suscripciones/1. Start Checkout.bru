@@ -1,0 +1,54 @@
+meta {
+  name: 1. Start Checkout
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/suscripciones
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "ciclo": "mensual",
+    "facturacion": {
+      "nombreCompleto": "Demo User",
+      "email": "generic.user@gmail.com",
+      "pais": "MX",
+      "ciudad": "CDMX",
+      "direccion": "Calle 1 #123",
+      "codigoPostal": "06600"
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.suscripcionId) {
+    bru.setVar("suscripcionId", res.body.suscripcionId);
+  }
+  if (res.body && res.body.clientSecret) {
+    bru.setVar("clientSecret", res.body.clientSecret);
+  }
+}
+
+docs {
+  Step one of two. Returns a Stripe clientSecret and publishableKey. Requires
+  STRIPE_SECRET_KEY / STRIPE_PRICE_PRO_* to be configured (Stripe test mode) — otherwise
+  this call fails.
+
+  Safe to re-run: an existing INCOMPLETA subscription for the same cycle is reused rather
+  than duplicated in Stripe, so retrying after a back-button never creates a second row.
+
+  Bruno cannot complete step two by itself: confirming the payment requires Stripe
+  Elements tokenizing a card client-side in a browser (by design — the server never
+  touches raw card numbers). Use the live checkout at the frontend URL with Stripe's test
+  card 4242 4242 4242 4242 / any future date / any CVC, then call "2. Confirm Payment"
+  below with the suscripcionId it produces.
+}
