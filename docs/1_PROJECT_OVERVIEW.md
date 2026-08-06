@@ -1,100 +1,104 @@
-# Katedra — Project Overview
+# Katedra — Descripción General del Proyecto
 
-> Technical docs are written in English. The public-facing READMEs are available in both
-> English and Spanish.
+> Versión en español. English version: [1_PROJECT_OVERVIEW.en.md](./1_PROJECT_OVERVIEW.en.md).
 
-## 1. What it is
+## 1. Qué es
 
-Katedra is an AI-driven academic content generator built for teachers. A teacher describes a
-syllabus once — by hand, by uploading a document, or from a URL — and Katedra generates the
-teaching material for it: the syllabus outline, the theory, a multiple-choice exam, and
-presentation slides. Everything generated stays organised under the syllabus it came from, and
-can be exported to the formats teachers actually hand in.
+Katedra es un generador de contenido académico impulsado por IA, construido para profesores. Un
+profesor describe un temario una sola vez —a mano, subiendo un documento, o desde una URL— y
+Katedra genera el material didáctico correspondiente: la estructura del temario, la teoría, un
+examen de opción múltiple y diapositivas de presentación. Todo lo generado queda organizado bajo
+el temario del que proviene, y puede exportarse a los formatos que los profesores realmente
+entregan.
 
-The target user is a working teacher, and the goal is to remove the bulk of manual preparation
-time rather than to replace the teacher's judgement.
+El usuario objetivo es un profesor en activo, y el objetivo es eliminar la mayor parte del tiempo
+de preparación manual, no reemplazar el criterio del profesor.
 
-## 2. What it generates
+## 2. Qué genera
 
-Four pieces of material, defined by `PiezaMaterial`:
+Cuatro piezas de material, definidas por `PiezaMaterial`:
 
-| Piece | Value | Output |
+| Pieza | Valor | Salida |
 |---|---|---|
-| Outline | `estructura` | Units / topics / subtopics as markdown. Generated automatically when a syllabus is created. |
-| Theory | `teoria` | Full lesson prose in markdown, on demand. |
-| Exam | `evaluacion` | Structured multiple-choice questions, each with the correct option and an explanation. |
-| Slides | `diapositivas` | Structured slide deck. Pro plan only. |
+| Estructura | `estructura` | Unidades / temas / subtemas en markdown. Se genera automáticamente al crear un temario. |
+| Teoría | `teoria` | Prosa completa de la clase en markdown, a demanda. |
+| Examen | `evaluacion` | Preguntas estructuradas de opción múltiple, cada una con la opción correcta y una explicación. |
+| Diapositivas | `diapositivas` | Presentación estructurada. Solo plan Pro. |
 
-Exams are generated **from the theory text**, not from the raw syllabus, so the exam tests what
-the student actually read. Requesting an exam with no theory available is rejected with a 400.
+Los exámenes se generan **a partir del texto de la teoría**, no del temario en bruto, para que el
+examen evalúe lo que el estudiante realmente leyó. Pedir un examen sin teoría disponible se
+rechaza con un 400.
 
-## 3. Two generation tiers
+## 3. Dos niveles de generación
 
-The API exposes a branded tier key, never a raw model id, so the AI provider can change by
-configuration without breaking clients. Defined in `ModeloIA`:
+La API expone una clave de nivel de marca, nunca un id de modelo en bruto, para que el proveedor
+de IA pueda cambiarse por configuración sin romper a los clientes. Definido en `ModeloIA`:
 
-| Tier | Key | Display | Model | Behaviour |
+| Nivel | Clave | Nombre visible | Modelo | Comportamiento |
 |---|---|---|---|---|
-| Fast | `flash` | Tutor | `gpt-4.1-mini` | 5–15 theory paragraphs, 1–10 exam questions, 5–10 slides. `temperature 0.5`, 2500 max tokens. |
-| Deep | `pro` | Catedrático | `o4-mini` (reasoning) | 20–40 theory paragraphs capped at 5000 words, 15–30 exam questions, 10–20 slides. `reasoningEffort=medium`, 12000 max completion tokens, and **no** temperature — reasoning models reject it. |
+| Rápido | `flash` | Tutor | `gpt-4.1-mini` | 5–15 párrafos de teoría, 1–10 preguntas de examen, 5–10 diapositivas. `temperature 0.5`, 2500 tokens máximos. |
+| Profundo | `pro` | Catedrático | `o4-mini` (razonamiento) | 20–40 párrafos de teoría con tope de 5000 palabras, 15–30 preguntas de examen, 10–20 diapositivas. `reasoningEffort=medium`, 12000 tokens máximos de completado, y **sin** temperature — los modelos de razonamiento la rechazan. |
 
-Within a tier the exact paragraph / question / slide count is user-selectable per request and
-validated against the tier's range; out-of-range values are rejected with a 400.
+Dentro de un nivel, la cantidad exacta de párrafos / preguntas / diapositivas es seleccionable por
+el usuario en cada petición y se valida contra el rango del nivel; los valores fuera de rango se
+rechazan con un 400.
 
-## 4. Academic level
+## 4. Nivel académico
 
-Every syllabus targets one of five bands (`NivelAcademico`): `primaria`, `secundaria`,
-`bachillerato`, `universitario`, `posgrado`. Each band carries a rubric injected into every
-generation prompt, so the same topic reads differently for a 10-year-old than for a postgraduate.
-The level is never silently defaulted, and when a syllabus lists several levels the most advanced
-one wins — material should never undershoot its hardest audience.
+Cada temario apunta a una de cinco bandas (`NivelAcademico`): `primaria`, `secundaria`,
+`bachillerato`, `universitario`, `posgrado`. Cada banda lleva una rúbrica que se inyecta en cada
+prompt de generación, así el mismo tema se lee distinto para un niño de 10 años que para un
+estudiante de posgrado. El nivel nunca toma un valor por defecto en silencio, y cuando un temario
+lista varios niveles, gana el más avanzado — el material nunca debe quedarse corto frente a su
+audiencia más exigente.
 
-## 5. Export
+## 5. Exportación
 
-Export runs through `FormatoExportacion`. Not every format applies to every piece;
-`FormatoExportacion.soporta(...)` is the single source of truth:
+La exportación pasa por `FormatoExportacion`. No todos los formatos aplican a todas las piezas;
+`FormatoExportacion.soporta(...)` es la única fuente de verdad:
 
-| Format | Extension | Applies to | Plan |
+| Formato | Extensión | Aplica a | Plan |
 |---|---|---|---|
-| PDF | `.pdf` | theory, exam, slides | Free |
-| Word | `.docx` | theory, exam | Free |
-| PowerPoint | `.pptx` | slides | Pro (slides are Pro) |
-| Markdown | `.md` | theory, exam | Pro |
-| Google Forms script | `.gs` | exam | Pro |
+| PDF | `.pdf` | teoría, examen, diapositivas | Free |
+| Word | `.docx` | teoría, examen | Free |
+| PowerPoint | `.pptx` | diapositivas | Pro (las diapositivas son Pro) |
+| Markdown | `.md` | teoría, examen | Pro |
+| Script de Google Forms | `.gs` | examen | Pro |
 
-The Google Forms export emits an Apps Script that recreates the exam as a self-grading Google
-Form.
+La exportación a Google Forms genera un Apps Script que recrea el examen como un Google Form
+autocalificable.
 
-## 6. Plans
+## 6. Planes
 
-Two billing tiers (`PlanUsuario`), enforced server-side against the database — never against the
-JWT claim, which is display-only:
+Dos niveles de facturación (`PlanUsuario`), aplicados en el servidor contra la base de datos —
+nunca contra el claim del JWT, que es solo informativo:
 
 | | Free | Pro |
 |---|---|---|
-| Generations / day | 10 | 100 |
-| Exports / day | 5 | 100 |
-| Catedrático tier | — | yes |
-| Slides | — | yes |
-| File upload | — | yes |
-| URL import | — | yes |
-| Markdown + Google Forms export | — | yes |
+| Generaciones / día | 10 | 100 |
+| Exportaciones / día | 5 | 100 |
+| Nivel Catedrático | — | sí |
+| Diapositivas | — | sí |
+| Subida de archivo | — | sí |
+| Importación por URL | — | sí |
+| Exportación Markdown + Google Forms | — | sí |
 
-Caps are per-day rather than lifetime on purpose: a permanently useful free tier drives return
-visits, while a lifetime cap causes churn the moment it is hit. Upgrade pressure is meant to come
-from the capability locks, not from starving the quota. The Pro figure of 100/day is an abuse
-ceiling, not a paywall — every generation is a real OpenAI call.
+Los límites son por día y no de por vida a propósito: un plan gratuito permanentemente útil
+genera visitas de retorno, mientras que un límite de por vida provoca abandono en cuanto se
+alcanza. La presión para actualizar debe venir de las funciones bloqueadas, no de asfixiar la
+cuota. La cifra de 100/día en Pro es un techo contra abuso, no un muro de pago — cada generación
+es una llamada real a OpenAI.
 
-Billing runs on Stripe Subscriptions (monthly and annual). The server treats Stripe as the source
-of truth: the webhook and the browser's explicit confirmation both call the same idempotent sync,
-so whichever arrives first wins and the second is a no-op.
+La facturación corre sobre Stripe Subscriptions (mensual y anual). El servidor trata a Stripe
+como la fuente de verdad: tanto el webhook como la confirmación explícita del navegador llaman a
+la misma sincronización idempotente, así que quien llegue primero gana y el segundo no hace nada.
 
-## 7. Documentation map
+## 7. Mapa de documentación
 
-- [2_ARCHITECTURE_AND_TECH_STACK.md](./2_ARCHITECTURE_AND_TECH_STACK.md) — layers, data flow, AI
-  integration, security.
-- [3_STATUS_AND_ROADMAP.md](./3_STATUS_AND_ROADMAP.md) — what ships today, what is next.
-- REST contract: generated live from the controllers via springdoc — run the app and open
-  `/api/v1/swagger-ui/index.html`, or fetch the raw spec from `/api/v1/v3/api-docs`.
-- [`api/bruno/`](../api/bruno/) — a runnable Bruno collection covering every endpoint.
-- Frontend repo: [katedra-client](https://github.com/SAULALEE/katedra-client).
+- [2_ARCHITECTURE_AND_TECH_STACK.md](./2_ARCHITECTURE_AND_TECH_STACK.md) — capas, flujo de datos,
+  integración de IA, seguridad.
+- [3_STATUS_AND_ROADMAP.md](./3_STATUS_AND_ROADMAP.md) — qué está publicado hoy, qué sigue.
+- Contrato REST: generado en vivo desde los controladores vía springdoc — arranca la app y abre
+  `/api/v1/swagger-ui/index.html`, o descarga el spec crudo desde `/api/v1/v3/api-docs`.
+- [`api/bruno/`](../api/bruno/) — una colección de Bruno ejecutable que cubre cada endpoint.
+- Repositorio del frontend: [katedra-client](https://github.com/SAULALEE/katedra-client).

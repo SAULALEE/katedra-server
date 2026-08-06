@@ -1,110 +1,125 @@
-# Architecture and Tech Stack
+# Arquitectura y Stack Tecnológico
+
+> Versión en español. English version: [2_ARCHITECTURE_AND_TECH_STACK.en.md](./2_ARCHITECTURE_AND_TECH_STACK.en.md).
 
 ## 1. Stack
 
-| Concern | Choice |
+| Aspecto | Elección |
 |---|---|
-| Language | Java 21 |
+| Lenguaje | Java 21 |
 | Framework | Spring Boot 4.0.6 |
-| AI integration | Spring AI (`ChatClient`) over OpenAI |
-| Database | MySQL 8.0 |
-| Migrations | Flyway |
-| Payments | Stripe Subscriptions (Java SDK) |
-| Secrets | Doppler in development; plain environment variables in production |
-| Auth | Spring Security, stateless JWT, optional Google / Microsoft OAuth2 |
+| Integración de IA | Spring AI (`ChatClient`) sobre OpenAI |
+| Base de datos | MySQL 8.0 |
+| Migraciones | Flyway |
+| Pagos | Stripe Subscriptions (SDK de Java) |
+| Secretos | Doppler en desarrollo; variables de entorno planas en producción |
+| Auth | Spring Security, JWT sin estado, OAuth2 opcional (Google / Microsoft) |
 | Tests | JUnit 5, Mockito, AssertJ, `@WebMvcTest` |
-| Container | Multi-stage Dockerfile on Eclipse Temurin 21, runs as a non-root user |
+| Contenedor | Dockerfile multi-etapa sobre Eclipse Temurin 21, corre como usuario no-root |
 
-## 2. Architecture
+## 2. Arquitectura
 
-Katedra is a **layered modular monolith**. For a one-developer project this gives the structural
-discipline of service boundaries without the operational cost of running several services — one
-deployable, one database, one transaction boundary.
+Katedra es un **monolito modular por capas**. Para un proyecto de un solo desarrollador, esto da
+la disciplina estructural de los límites de servicio sin el costo operativo de correr varios
+servicios — un solo desplegable, una sola base de datos, un solo límite transaccional.
 
-### 2.1 Layers
+### 2.1 Capas
 
 ```
-REST Controller  ──  DTO  ──  Service  ──  Entity  ──  Repository  ──  MySQL
-                                 │
-                                 └──  ChatClient (Spring AI)  ──  OpenAI
+Controlador REST  ──  DTO  ──  Service  ──  Entity  ──  Repository  ──  MySQL
+                                  │
+                                  └──  ChatClient (Spring AI)  ──  OpenAI
 ```
 
-Enforced boundaries:
+Límites aplicados:
 
-1. **Controllers** handle HTTP only — routing, status codes, validation entry. They accept and
-   return DTOs, never entities.
-2. **Services** hold business logic, AI orchestration, and Entity↔DTO mapping.
-3. **Repositories** are Spring Data JPA interfaces. No business logic.
-4. **Entities** map to MySQL tables and never leave the service layer.
+1. Los **controladores** manejan solo HTTP — enrutamiento, códigos de estado, entrada de
+   validación. Aceptan y devuelven DTOs, nunca entidades.
+2. Los **services** contienen la lógica de negocio, la orquestación de IA, y el mapeo
+   Entity↔DTO.
+3. Los **repositories** son interfaces de Spring Data JPA. Sin lógica de negocio.
+4. Las **entities** mapean a tablas de MySQL y nunca salen de la capa de servicio.
 
-Errors are handled centrally by a `@RestControllerAdvice` global exception handler, so controllers
-contain no error-mapping code.
+Los errores se manejan de forma centralizada mediante un manejador global de excepciones
+`@RestControllerAdvice`, así que los controladores no contienen código de mapeo de errores.
 
-### 2.2 Request surface
+### 2.2 Superficie de peticiones
 
-Eight controllers: authentication, syllabi (`temarios`), subjects (`asignaturas`), content
-generation, exports, subscriptions, users, and the Stripe webhook. All routes sit under the
-`/api/v1` context path.
+Ocho controladores: autenticación, temarios (`temarios`), asignaturas (`asignaturas`), generación
+de contenido, exportaciones, suscripciones, usuarios, y el webhook de Stripe. Todas las rutas
+viven bajo el path de contexto `/api/v1`.
 
-## 3. AI integration
+## 3. Integración de IA
 
-- **Spring AI `ChatClient`** abstracts the provider. Nothing in the codebase calls the OpenAI SDK
-  directly, so switching provider is a configuration change.
-- **Async by default.** Generation runs on `@Async` methods returning `CompletableFuture`, on a
-  dedicated `ai-` thread pool. The reasoning tier routinely takes 30–90 seconds, so Spring MVC's
-  async request timeout is raised to 180s — the 30s default was silently returning 503 before the
-  model had finished.
-- **Prompts are content, not code.** Every system prompt lives in
-  `src/main/resources/prompts/*.st` and is rendered through Spring AI's `PromptTemplate`.
-  `PromptTemplates` is the only class that touches those files; prompt text is never inlined into
-  `.java`.
-- **Response format follows the content.** Prose (theory) comes back as plain markdown. Inherently
-  structured content (exams, slides) uses OpenAI Structured Outputs via `.entity(...)`, so there
-  is no hand-rolled JSON parsing.
-- **Per-tier call options.** There is deliberately no global `spring.ai.openai.chat.options`
-  default: a global default gets merged into every call, which is how `temperature` and
-  `max_tokens` previously leaked into reasoning-model requests that reject them. Each call sets a
-  complete, tier-specific options object instead.
+- **`ChatClient` de Spring AI** abstrae al proveedor. Nada en el código llama directamente al SDK
+  de OpenAI, así que cambiar de proveedor es un cambio de configuración.
+- **Asíncrono por defecto.** La generación corre en métodos `@Async` que devuelven
+  `CompletableFuture`, en un pool de hilos dedicado `ai-`. El nivel de razonamiento suele tomar
+  entre 30 y 90 segundos, así que el timeout de petición asíncrona de Spring MVC se sube a 180s —
+  el valor por defecto de 30s devolvía silenciosamente un 503 antes de que el modelo terminara.
+- **Los prompts son contenido, no código.** Cada system prompt vive en
+  `src/main/resources/prompts/*.st` y se renderiza a través del `PromptTemplate` de Spring AI.
+  `PromptTemplates` es la única clase que toca esos archivos; el texto de los prompts nunca se
+  escribe directamente en un `.java`.
+- **El formato de respuesta sigue al contenido.** La prosa (teoría) vuelve como markdown plano.
+  El contenido inherentemente estructurado (exámenes, diapositivas) usa Structured Outputs de
+  OpenAI vía `.entity(...)`, así que no hay parseo de JSON hecho a mano.
+- **Opciones de llamada por nivel.** Deliberadamente no hay un `spring.ai.openai.chat.options`
+  global por defecto: un valor por defecto global se fusiona en cada llamada, que es como
+  `temperature` y `max_tokens` se filtraban antes hacia peticiones de modelos de razonamiento que
+  las rechazan. Cada llamada define en su lugar un objeto de opciones completo y específico del
+  nivel.
 
-## 4. Database design
+## 4. Diseño de base de datos
 
-- **UUID primary keys** stored as `CHAR(36)`, generated by Hibernate's `@UuidGenerator`.
-- **Soft deletes.** Hard deletes are forbidden for domain entities; each table carries a nullable
-  `deleted_at` and the entity uses `@SQLDelete` + a `deleted_at IS NULL` filter. The `suscripcion`
-  table is a deliberate exception — it is a billing history log, so its rows are never deleted.
-- **Lazy fetching** by default on all relationships, to avoid N+1 queries.
-- **Flyway only.** Every schema change is a `V[Version]__[Description].sql` migration; there are
-  no manual database interventions and `ddl-auto` is set to `validate`, so the application refuses
-  to start if the schema and the entities disagree.
-- **Naming.** `snake_case` in MySQL, `camelCase` in Java. Domain vocabulary stays Spanish
-  (`temario`, `asignatura`, `suscripcion`) because that is the language of the problem domain.
+- **Claves primarias UUID** almacenadas como `CHAR(36)`, generadas por `@UuidGenerator` de
+  Hibernate.
+- **Borrados suaves.** Los borrados físicos están prohibidos para entidades de dominio; cada
+  tabla lleva un `deleted_at` opcional y la entidad usa `@SQLDelete` + un filtro
+  `deleted_at IS NULL`. La tabla `suscripcion` es una excepción deliberada — es un registro
+  histórico de facturación, así que sus filas nunca se borran.
+- **Carga perezosa (lazy)** por defecto en todas las relaciones, para evitar consultas N+1.
+- **Solo Flyway.** Cada cambio de esquema es una migración `V[Version]__[Descripción].sql`; no
+  hay intervenciones manuales en la base de datos y `ddl-auto` está en `validate`, así que la
+  aplicación se niega a arrancar si el esquema y las entidades no coinciden.
+- **Nomenclatura.** `snake_case` en MySQL, `camelCase` en Java. El vocabulario de dominio se
+  mantiene en español (`temario`, `asignatura`, `suscripcion`) porque ese es el idioma del
+  dominio del problema.
 
-## 5. Billing and quota enforcement
+## 5. Facturación y aplicación de cuotas
 
-Plan limits are enforced at three choke points, all in `PlanLimitService`, and all reading the
-plan **from the database** rather than from the JWT:
+Los límites de plan se aplican en tres puntos de control, todos en `PlanLimitService`, y todos
+leyendo el plan **desde la base de datos** en lugar de desde el JWT:
 
-1. **Capability check → 403.** Runs before any I/O: is this tier allowed to use the Catedrático
-   model, generate slides, upload a file, import a URL, or use an advanced export format?
-2. **Quota reservation → 429.** Runs last before committing to the async AI pipeline, in a
-   `REQUIRES_NEW` transaction against a `UNIQUE(usuario_id, fecha)` daily-usage row.
-3. **Quota refund.** If pieces fail during generation, the reserved count is released back.
+1. **Verificación de capacidad → 403.** Corre antes de cualquier I/O: ¿este nivel puede usar el
+   modelo Catedrático, generar diapositivas, subir un archivo, importar una URL, o usar un
+   formato de exportación avanzado?
+2. **Reserva de cuota → 429.** Corre justo antes de comprometerse con el pipeline asíncrono de
+   IA, en una transacción `REQUIRES_NEW` contra una fila diaria de uso con
+   `UNIQUE(usuario_id, fecha)`.
+3. **Reembolso de cuota.** Si alguna pieza falla durante la generación, el conteo reservado se
+   libera de vuelta.
 
-The JWT carries a `plan` claim, but only so the UI can paint the plan badge immediately. Because a
-token lives an hour and a plan can change mid-session, every actual gate re-reads the database.
+El JWT lleva un claim `plan`, pero solo para que la UI pueda pintar la insignia del plan de
+inmediato. Como un token vive una hora y un plan puede cambiar a mitad de sesión, cada
+verificación real vuelve a leer la base de datos.
 
-## 6. Security
+## 6. Seguridad
 
-- **Stateless JWT** validated by a custom `JwtAuthenticationFilter` ahead of the controllers. CSRF
-  is disabled because there is no session and no cookie-borne credential.
-- **CORS allow-list** via `app.cors.allowed-origins`. It defaults to the Vite dev server for local
-  work, and production **must** override it — the prod profile has no default.
-- **Fail-fast production config.** `application-prod.properties` declares `DB_*`, `JWT_SECRET` and
-  `CORS_ALLOWED_ORIGINS` with no fallback values, so a missing secret stops the application from
-  starting instead of silently running on a development default.
-- **Stripe webhook signatures** are verified against the raw request body before the payload is
-  deserialised.
-- **Input validation** at the controller boundary with Jakarta Validation annotations on DTO
-  records.
-- **Error bodies** expose hand-written validation messages only; stack traces are never included.
-- **Ownership checks** in the service layer: a user can only reach their own syllabi and material.
+- **JWT sin estado** validado por un `JwtAuthenticationFilter` personalizado antes de los
+  controladores. CSRF está deshabilitado porque no hay sesión ni credencial en cookie.
+- **Lista blanca de CORS** vía `app.cors.allowed-origins`. Por defecto apunta al servidor de
+  desarrollo de Vite para trabajo local, y producción **debe** sobrescribirla — el perfil prod no
+  tiene valor por defecto.
+- **Configuración de producción a prueba de fallos.** `application-prod.properties` declara
+  `DB_*`, `JWT_SECRET` y `CORS_ALLOWED_ORIGINS` sin valores de respaldo, así que un secreto
+  faltante detiene el arranque de la aplicación en lugar de correr silenciosamente sobre un valor
+  de desarrollo.
+- Las **firmas del webhook de Stripe** se verifican contra el cuerpo crudo de la petición antes
+  de deserializar el payload.
+- **Validación de entrada** en el límite del controlador con anotaciones de Jakarta Validation
+  sobre records DTO.
+- Los **cuerpos de error** exponen únicamente mensajes de validación escritos a mano; los stack
+  traces nunca se incluyen.
+- **Verificaciones de propiedad** en la capa de servicio: un usuario solo puede acceder a sus
+  propios temarios y material.
