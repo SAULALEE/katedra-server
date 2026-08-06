@@ -48,7 +48,7 @@ flowchart LR
 
 A layered modular monolith: controllers only see DTOs, entities never leave the service
 layer, all AI and Stripe calls are async. Details in
-[docs/2_ARCHITECTURE_AND_TECH_STACK.md](docs/2_ARCHITECTURE_AND_TECH_STACK.md).
+[docs/2_ARCHITECTURE_AND_TECH_STACK.en.md](docs/2_ARCHITECTURE_AND_TECH_STACK.en.md).
 
 ---
 
@@ -65,8 +65,8 @@ layer, all AI and Stripe calls are async. Details in
 | API docs | springdoc (live from the code) + a Bruno collection |
 | Container | Multi-stage Dockerfile, non-root user |
 
-Full picture: [docs/1_PROJECT_OVERVIEW.md](docs/1_PROJECT_OVERVIEW.md) ·
-[docs/3_STATUS_AND_ROADMAP.md](docs/3_STATUS_AND_ROADMAP.md).
+Full picture: [docs/1_PROJECT_OVERVIEW.en.md](docs/1_PROJECT_OVERVIEW.en.md) ·
+[docs/3_STATUS_AND_ROADMAP.en.md](docs/3_STATUS_AND_ROADMAP.en.md).
 
 ---
 
@@ -157,6 +157,6 @@ docs/           architecture and roadmap docs
 
 ## Roadmap
 
-See [docs/3_STATUS_AND_ROADMAP.md](docs/3_STATUS_AND_ROADMAP.md) for what's shipped and
+See [docs/3_STATUS_AND_ROADMAP.en.md](docs/3_STATUS_AND_ROADMAP.en.md) for what's shipped and
 what's next — briefly: Stripe live mode, demo-account rate limiting, integration tests
 against a real database, and deeper slide generation.
