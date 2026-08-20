@@ -18,8 +18,10 @@ Versión en inglés: [README.en.md](README.en.md) · Frontend: [katedra-client](
 - **API:** https://katedra-server.onrender.com/api/v1
 
 > **Credenciales de demo:** aún no publicadas — ver [Cuentas de demo](#cuentas-de-demo) más abajo.
-> El API está alojado en el plan gratuito de Render, así que la primera petición tras un
-> período de inactividad puede tardar hasta un minuto en despertar el servicio.
+> El API está alojado en el plan gratuito de Render, que suspende el servicio tras unos
+> minutos sin tráfico. Un cron externo hace ping a `/api/v1/health` cada 10 minutos para
+> mantenerlo despierto, así que la demo responde de inmediato; si ese ping fallara, la
+> primera petición puede tardar hasta un minuto en levantar el servicio.
 
 ### Cuentas de demo
 
