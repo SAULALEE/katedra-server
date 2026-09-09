@@ -13,40 +13,13 @@ import java.util.Optional;
 /**
  * Daily quota accounting.
  *
- * <p>The reservation is two statements rather than one {@code INSERT ... ON DUPLICATE KEY
- * UPDATE}: that construct's return code is ambiguous (1 = insert, 2 = update-with-change,
- * 0 = no-change), its INSERT branch bypasses the limit check entirely, and touching
- * {@code updated_at} unconditionally destroys the "0 means rejected" signal. Split in two,
- * there is exactly one unambiguous integer answer.
+ * <p>The row creation is delegated to the profile-specific {@link UsoDiarioUpsert}.
+ * Conditional quota updates remain portable JPQL, and their affected-row count is the
+ * unambiguous reservation result.
  */
 public interface UsoDiarioRepository extends JpaRepository<UsoDiario, String> {
 
     Optional<UsoDiario> findByUsuarioIdAndFecha(String usuarioId, LocalDate fecha);
-
-    /**
-     * Ensures today's row exists. Idempotent — the UNIQUE(usuario_id, fecha) constraint
-     * absorbs the race between concurrent first-requests of the day, and the loser just
-     * falls through to the conditional update.
-     *
-     * <p>{@code ON DUPLICATE KEY UPDATE usuario_id = usuario_id} is a deliberate no-op
-     * update: on conflict nothing is written, so a late caller cannot reset a counter the
-     * winner already incremented. The return value is meaningless here (MySQL reports 1
-     * for insert, 0 for no-change) and is ignored — the quota decision belongs entirely to
-     * the conditional UPDATE below.
-     *
-     * <p>Native because this has no JPQL equivalent. INSERT IGNORE was the obvious
-     * candidate but H2 rejects it outright even in MODE=MySQL, which
-     * {@code UsoDiarioRepositoryTest} caught; ON DUPLICATE KEY UPDATE is understood by
-     * both engines.
-     */
-    @Modifying
-    @Transactional
-    @Query(value = "INSERT INTO uso_diario (id, usuario_id, fecha, generaciones, exportaciones, created_at) "
-            + "VALUES (:id, :usuarioId, :fecha, 0, 0, CURRENT_TIMESTAMP) "
-            + "ON DUPLICATE KEY UPDATE usuario_id = usuario_id", nativeQuery = true)
-    int crearFilaSiNoExiste(@Param("id") String id,
-                            @Param("usuarioId") String usuarioId,
-                            @Param("fecha") LocalDate fecha);
 
     /**
      * Conditionally consumes quota. The affected-row count IS the answer: 1 means

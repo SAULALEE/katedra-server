@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
 import java.time.LocalDate;
@@ -34,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Import(MySqlUsoDiarioUpsert.class)
 @TestPropertySource(properties = {
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.flyway.enabled=false"
@@ -42,6 +44,9 @@ class UsoDiarioRepositoryTest {
 
     @Autowired
     private UsoDiarioRepository usoDiarioRepository;
+
+    @Autowired
+    private UsoDiarioUpsert usoDiarioUpsert;
 
     @Autowired
     private UsuarioRepository usuarioRepository;
@@ -56,7 +61,7 @@ class UsoDiarioRepositoryTest {
     }
 
     private void crearFilaDeHoy() {
-        usoDiarioRepository.crearFilaSiNoExiste(UUID.randomUUID().toString(), usuarioId, hoy);
+        usoDiarioUpsert.crearFilaSiNoExiste(UUID.randomUUID().toString(), usuarioId, hoy);
     }
 
     private int generacionesDeHoy() {
@@ -135,7 +140,7 @@ class UsoDiarioRepositoryTest {
     @DisplayName("quota is scoped per day: yesterday's usage does not count against today")
     void laCuotaEsPorDia() {
         LocalDate ayer = hoy.minusDays(1);
-        usoDiarioRepository.crearFilaSiNoExiste(UUID.randomUUID().toString(), usuarioId, ayer);
+        usoDiarioUpsert.crearFilaSiNoExiste(UUID.randomUUID().toString(), usuarioId, ayer);
         usoDiarioRepository.consumirGeneraciones(usuarioId, ayer, 10, 10);
 
         crearFilaDeHoy();
