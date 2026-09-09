@@ -9,6 +9,7 @@ import Katedra.Server.model.PlanUsuario;
 import Katedra.Server.model.UsoDiario;
 import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.UsoDiarioRepository;
+import Katedra.Server.repository.UsoDiarioUpsert;
 import Katedra.Server.repository.UsuarioRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -39,10 +40,14 @@ public class PlanLimitService {
 
     private final UsuarioRepository usuarioRepository;
     private final UsoDiarioRepository usoDiarioRepository;
+    private final UsoDiarioUpsert usoDiarioUpsert;
 
-    public PlanLimitService(UsuarioRepository usuarioRepository, UsoDiarioRepository usoDiarioRepository) {
+    public PlanLimitService(UsuarioRepository usuarioRepository,
+                            UsoDiarioRepository usoDiarioRepository,
+                            UsoDiarioUpsert usoDiarioUpsert) {
         this.usuarioRepository = usuarioRepository;
         this.usoDiarioRepository = usoDiarioRepository;
+        this.usoDiarioUpsert = usoDiarioUpsert;
     }
 
     /**
@@ -195,7 +200,7 @@ public class PlanLimitService {
     }
 
     private void asegurarFila(String usuarioId, LocalDate fecha) {
-        usoDiarioRepository.crearFilaSiNoExiste(UUID.randomUUID().toString(), usuarioId, fecha);
+        usoDiarioUpsert.crearFilaSiNoExiste(UUID.randomUUID().toString(), usuarioId, fecha);
     }
 
     private int generacionesUsadas(String usuarioId, LocalDate fecha) {

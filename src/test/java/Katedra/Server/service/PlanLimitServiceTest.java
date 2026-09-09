@@ -9,6 +9,7 @@ import Katedra.Server.model.PlanUsuario;
 import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.UsoDiarioRepository;
+import Katedra.Server.repository.UsoDiarioUpsert;
 import Katedra.Server.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,6 +44,9 @@ class PlanLimitServiceTest {
 
     @Mock
     private UsoDiarioRepository usoDiarioRepository;
+
+    @Mock
+    private UsoDiarioUpsert usoDiarioUpsert;
 
     @InjectMocks
     private PlanLimitService planLimitService;
@@ -202,7 +206,7 @@ class PlanLimitServiceTest {
         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
         assertThat(ex.getReason()).contains("11").contains("10");
         verify(usoDiarioRepository, never()).consumirGeneraciones(any(), any(), anyInt(), anyInt());
-        verify(usoDiarioRepository, never()).crearFilaSiNoExiste(anyString(), anyString(), any());
+        verify(usoDiarioUpsert, never()).crearFilaSiNoExiste(anyString(), anyString(), any());
     }
 
     @Test
@@ -221,7 +225,7 @@ class PlanLimitServiceTest {
 
         planLimitService.reservarGeneraciones(free, 1);
 
-        verify(usoDiarioRepository).crearFilaSiNoExiste(anyString(), any(), eq(LocalDate.now()));
+        verify(usoDiarioUpsert).crearFilaSiNoExiste(anyString(), any(), eq(LocalDate.now()));
     }
 
     @Test
