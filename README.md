@@ -70,16 +70,15 @@ Panorama completo: [docs/1_PROJECT_OVERVIEW.md](docs/1_PROJECT_OVERVIEW.md) ·
 
 ---
 
-## Inicio rápido (sin necesitar cuenta de Doppler)
+## Inicio rápido
 
-Requiere Docker.
+Requiere Docker, Doppler y acceso al proyecto `katedra-server`.
 
 ```bash
 git clone https://github.com/SAULALEE/katedra-server.git
 cd katedra-server
-cp .env.example .env
-# edita .env y define OPENAI_API_KEY para generar contenido real — todo lo demás ya tiene un valor por defecto funcional
-docker compose up -d
+doppler login
+./scripts/local-stack.sh up
 ```
 
 El API queda disponible en `http://localhost:8080/api/v1`. Confírmalo:
@@ -94,43 +93,43 @@ precios) — ese endpoint llama a Stripe incondicionalmente y necesita
 `STRIPE_PRICE_PRO_MENSUAL` / `STRIPE_PRICE_PRO_ANUAL` configurados para responder. Todo lo
 demás funciona con la facturación en blanco.
 
-### PostgreSQL / Supabase
+### Modos de ejecución
 
-La aplicación mantiene MySQL como perfil local por defecto. Para staging o producción con
-Supabase, configura las variables `SUPABASE_DB_*` del `.env.example` y activa el perfil:
+`local` usa backend local y MySQL local en Docker. `production` usa el perfil Supabase; el
+backend alojado se utiliza desde el cliente con `npm run dev:production`.
+
+Para ejecutar el backend local conectado a Supabase:
 
 ```bash
-SPRING_PROFILES_ACTIVE=supabase ./mvnw spring-boot:run
+./scripts/run-production.sh
 ```
 
-Flyway usa `src/main/resources/db/migration-postgresql/B25__baseline_katedra_postgresql.sql`.
-La migración se ejecuta al iniciar la aplicación contra la base PostgreSQL configurada.
+Las configuraciones Doppler requeridas son `local` y `production`. `local` debe contener
+`SPRING_PROFILES_ACTIVE=mysql`, credenciales MySQL y las variables del API local. `production`
+debe contener `SPRING_PROFILES_ACTIVE=supabase`, `SUPABASE_DB_*` y las credenciales de
+producción. Flyway usa `src/main/resources/db/migration-postgresql/B25__baseline_katedra_postgresql.sql`
+en el perfil Supabase.
 
 ### Ejecutar sin Docker
 
-Java 21 y un MySQL 8 local son suficientes — cada propiedad en `application.properties` tiene
-un valor por defecto de desarrollo local, así que la app arranca contra
-`localhost:3306/katedra_dev` sin ninguna configuración adicional:
+Para iniciar únicamente el backend local contra un MySQL ya disponible:
 
 ```bash
-./mvnw spring-boot:run
+./scripts/run-local.sh
 ```
 
-Quienes tengan acceso a la organización de Doppler del proyecto pueden omitir `.env` por completo:
-
-```bash
-doppler run -- ./mvnw spring-boot:run
-```
+Estos scripts siempre ejecutan Maven o Docker a través de Doppler. No se usan `.env`,
+`.env.local` ni valores locales alternativos.
 
 ---
 
 ## Tests
 
 ```bash
-./mvnw test
+./scripts/test.sh
 ```
 
-336 tests —JUnit 5, Mockito, AssertJ, slices `@WebMvcTest`— corren contra una base de datos
+343 tests —JUnit 5, Mockito, AssertJ, slices `@WebMvcTest`— corren contra una base de datos
 H2 en memoria con Flyway deshabilitado, sin necesitar ningún servicio externo. CI ejecuta esto
 en cada push a `main` y `staging`.
 

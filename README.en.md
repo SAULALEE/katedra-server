@@ -58,10 +58,10 @@ layer, all AI and Stripe calls are async. Details in
 |---|---|
 | Language / framework | Java 21, Spring Boot 4.0.6 |
 | AI | Spring AI `ChatClient` → OpenAI (`gpt-4.1-mini` / `o4-mini`) |
-| Database | MySQL 8.0, Flyway migrations |
+| Database | Local MySQL 8.0 / Supabase PostgreSQL, Flyway migrations |
 | Auth | Stateless JWT, optional Google/Microsoft OAuth2 |
 | Billing | Stripe Subscriptions |
-| Tests | JUnit 5, Mockito, AssertJ, `@WebMvcTest` — 336 tests |
+| Tests | JUnit 5, Mockito, AssertJ, `@WebMvcTest` — 343 tests |
 | API docs | springdoc (live from the code) + a Bruno collection |
 | Container | Multi-stage Dockerfile, non-root user |
 
@@ -70,16 +70,15 @@ Full picture: [docs/1_PROJECT_OVERVIEW.en.md](docs/1_PROJECT_OVERVIEW.en.md) ·
 
 ---
 
-## Quickstart (no Doppler account needed)
+## Quickstart
 
-Requires Docker.
+Requires Docker, Doppler, and access to the `katedra-server` project.
 
 ```bash
 git clone https://github.com/SAULALEE/katedra-server.git
 cd katedra-server
-cp .env.example .env
-# edit .env and set OPENAI_API_KEY to generate real content — everything else has a working default
-docker compose up -d
+doppler login
+./scripts/local-stack.sh up
 ```
 
 The API is now at `http://localhost:8080/api/v1`. Confirm it's up:
@@ -93,31 +92,32 @@ Stripe is optional for everything except `GET /suscripciones/planes` (the public
 list) — that endpoint calls Stripe unconditionally and needs `STRIPE_PRICE_PRO_MENSUAL` /
 `STRIPE_PRICE_PRO_ANUAL` set to respond. Everything else works with billing left blank.
 
-### Running without Docker
+### Run modes
 
-Java 21 and a local MySQL 8 are enough — every property in `application.properties` has a
-local-development default, so the app starts against `localhost:3306/katedra_dev` with no
-configuration at all:
+`local` uses the local backend and local MySQL in Docker. `production` uses the Supabase
+profile; the hosted backend is used from the client with `npm run dev:production`.
 
-```bash
-./mvnw spring-boot:run
-```
-
-Contributors with access to the project's Doppler org can skip `.env` entirely:
+To run the backend locally against Supabase:
 
 ```bash
-doppler run -- ./mvnw spring-boot:run
+./scripts/run-production.sh
 ```
+
+The Doppler configurations are `local` and `production`. `local` must contain
+`SPRING_PROFILES_ACTIVE=mysql` and local MySQL credentials. `production` must contain
+`SPRING_PROFILES_ACTIVE=supabase` and the `SUPABASE_DB_*` production credentials.
+
+All scripts run Maven or Docker through Doppler. No `.env` or `.env.local` files are used.
 
 ---
 
 ## Tests
 
 ```bash
-./mvnw test
+./scripts/test.sh
 ```
 
-336 tests — JUnit 5, Mockito, AssertJ, `@WebMvcTest` slices — run against an in-memory H2
+343 tests — JUnit 5, Mockito, AssertJ, `@WebMvcTest` slices — run against an in-memory H2
 database with Flyway disabled, so no external service is required. CI runs this on every
 push to `main` and `staging`.
 
