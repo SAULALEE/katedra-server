@@ -58,7 +58,7 @@ la capa de servicio, todas las llamadas a IA y Stripe son asíncronas. Detalles 
 |---|---|
 | Lenguaje / framework | Java 21, Spring Boot 4.0.6 |
 | IA | Spring AI `ChatClient` → OpenAI (`gpt-4.1-mini` / `o4-mini`) |
-| Base de datos | MySQL 8.0, migraciones Flyway |
+| Base de datos | MySQL 8.0 local / PostgreSQL de Supabase, migraciones Flyway |
 | Autenticación | JWT sin estado, OAuth2 opcional (Google/Microsoft) |
 | Facturación | Stripe Subscriptions |
 | Tests | JUnit 5, Mockito, AssertJ, `@WebMvcTest` — 336 tests |
@@ -93,6 +93,18 @@ Stripe es opcional para todo excepto `GET /suscripciones/planes` (el listado pú
 precios) — ese endpoint llama a Stripe incondicionalmente y necesita
 `STRIPE_PRICE_PRO_MENSUAL` / `STRIPE_PRICE_PRO_ANUAL` configurados para responder. Todo lo
 demás funciona con la facturación en blanco.
+
+### PostgreSQL / Supabase
+
+La aplicación mantiene MySQL como perfil local por defecto. Para staging o producción con
+Supabase, configura las variables `SUPABASE_DB_*` del `.env.example` y activa el perfil:
+
+```bash
+SPRING_PROFILES_ACTIVE=supabase ./mvnw spring-boot:run
+```
+
+Flyway usa `src/main/resources/db/migration-postgresql/B25__baseline_katedra_postgresql.sql`.
+La migración se ejecuta al iniciar la aplicación contra la base PostgreSQL configurada.
 
 ### Ejecutar sin Docker
 

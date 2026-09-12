@@ -23,13 +23,16 @@ public class ContenidoTemario {
     @JoinColumn(name = "temario_id", nullable = false, unique = true)
     private Temario temario;
 
-    @Column(name = "estructura", columnDefinition = "LONGTEXT")
+    @JdbcTypeCode(SqlTypes.LONG32VARCHAR)
+    @Column(name = "estructura")
     private String estructura;
 
-    @Column(name = "teoria", columnDefinition = "LONGTEXT")
+    @JdbcTypeCode(SqlTypes.LONG32VARCHAR)
+    @Column(name = "teoria")
     private String teoria;
 
-    @Column(name = "contenido_fuente", columnDefinition = "LONGTEXT")
+    @JdbcTypeCode(SqlTypes.LONG32VARCHAR)
+    @Column(name = "contenido_fuente")
     private String contenidoFuente;
 
     @JdbcTypeCode(SqlTypes.JSON)
