@@ -102,7 +102,7 @@ def main():
     publicable = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
     webhook = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
     proyecto = os.environ.get("DOPPLER_PROJECT", "katedra-server")
-    config = os.environ.get("DOPPLER_CONFIG", "dev")
+    config = os.environ.get("DOPPLER_CONFIG", "local")
 
     # Refusing live keys is deliberate: this project bills in test mode only, and a stray
     # sk_live_ here would create real, chargeable prices in a production account.
@@ -146,7 +146,7 @@ def main():
     print("Listo. Verifica con:")
     print(f"  doppler secrets --project {proyecto} --config {config} --only-names | grep STRIPE")
     print("Arranca el backend con:")
-    print("  doppler run -- ./mvnw spring-boot:run")
+    print("  ./scripts/run-local.sh")
 
 
 if __name__ == "__main__":
