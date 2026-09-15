@@ -5,7 +5,7 @@
 
 Backend for **Katedra**, an AI-driven academic content generator for teachers. Give it a
 syllabus — typed, uploaded, or from a URL — and it generates the outline, theory, an exam,
-and slides, using real OpenAI calls through Spring AI. Spring Boot 4, Java 21, MySQL 8,
+and slides, using real OpenAI calls through Spring AI. Spring Boot 4, Java 21, PostgreSQL,
 Stripe billing.
 
 Spanish version: [README.md](README.md) · Frontend: [katedra-client](https://github.com/SAULALEE/katedra-client)
@@ -41,7 +41,7 @@ flowchart LR
         Service --> AI["Spring AI ChatClient"]
         Service --> Stripe["Stripe SDK"]
     end
-    Repo --> DB[(MySQL 8)]
+    Repo --> DB[(PostgreSQL)]
     AI --> OpenAI[("OpenAI\ngpt-4.1-mini / o4-mini")]
     Stripe --> StripeAPI[("Stripe API")]
 ```
@@ -58,7 +58,7 @@ layer, all AI and Stripe calls are async. Details in
 |---|---|
 | Language / framework | Java 21, Spring Boot 4.0.6 |
 | AI | Spring AI `ChatClient` → OpenAI (`gpt-4.1-mini` / `o4-mini`) |
-| Database | Local MySQL 8.0 / Supabase PostgreSQL, Flyway migrations |
+| Database | Local PostgreSQL / Supabase PostgreSQL, Flyway migrations |
 | Auth | Stateless JWT, optional Google/Microsoft OAuth2 |
 | Billing | Stripe Subscriptions |
 | Tests | JUnit 5, Mockito, AssertJ, `@WebMvcTest` — 343 tests |
@@ -94,7 +94,7 @@ list) — that endpoint calls Stripe unconditionally and needs `STRIPE_PRICE_PRO
 
 ### Run modes
 
-`local` uses the local backend and local MySQL in Docker. `production` uses the Supabase
+`dev` uses the local backend and local PostgreSQL in Docker. `prd` uses the Supabase
 profile; the hosted backend is used from the client with `npm run dev:production`.
 
 To run the backend locally against Supabase:
@@ -103,8 +103,9 @@ To run the backend locally against Supabase:
 ./scripts/run-production.sh
 ```
 
-The Doppler configurations are `local` and `production`. `local` must contain
-`SPRING_PROFILES_ACTIVE=mysql` and local MySQL credentials. `production` must contain
+The Doppler configurations are `dev` and `prd`. `dev` must contain
+`SPRING_PROFILES_ACTIVE=postgresql`, `POSTGRES_DB_NAME`, `POSTGRES_DB_USER`,
+`POSTGRES_DB_PASSWORD`, and local API credentials. `prd` must contain
 `SPRING_PROFILES_ACTIVE=supabase` and the `SUPABASE_DB_*` production credentials.
 
 All scripts run Maven or Docker through Doppler. No `.env` or `.env.local` files are used.

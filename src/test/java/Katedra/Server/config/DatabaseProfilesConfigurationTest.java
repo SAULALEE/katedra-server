@@ -16,19 +16,14 @@ import org.springframework.context.annotation.Profile;
 class DatabaseProfilesConfigurationTest {
 
     @Test
-    void shouldKeepMysqlAsDefaultAndSeparateVendorSpecificConfiguration() throws IOException {
+    void shouldUsePostgresqlAsDefaultDatabase() throws IOException {
         Properties common = load("application.properties");
-        Properties mysql = load("application-mysql.properties");
         Properties postgresql = load("application-postgresql.properties");
 
-        assertEquals("mysql", common.getProperty("spring.profiles.default"));
+        assertEquals("postgresql", common.getProperty("spring.profiles.default"));
         assertFalse(common.containsKey("spring.datasource.url"));
         assertFalse(common.containsKey("spring.datasource.driver-class-name"));
         assertFalse(common.containsKey("spring.flyway.locations"));
-
-        assertEquals("com.mysql.cj.jdbc.Driver", mysql.getProperty("spring.datasource.driver-class-name"));
-        assertEquals("classpath:db/migration", mysql.getProperty("spring.flyway.locations"));
-        assertEquals("${DB_PASSWORD}", mysql.getProperty("spring.datasource.password"));
 
         assertEquals("org.postgresql.Driver", postgresql.getProperty("spring.datasource.driver-class-name"));
         assertEquals("classpath:db/migration-postgresql", postgresql.getProperty("spring.flyway.locations"));
@@ -63,6 +58,7 @@ class DatabaseProfilesConfigurationTest {
         assertTrue(profile != null);
         assertTrue(java.util.List.of(profile.value()).contains("postgresql"));
         assertTrue(java.util.List.of(profile.value()).contains("supabase"));
+        assertTrue(java.util.List.of(profile.value()).contains("default"));
     }
 
     private Properties load(String resourceName) throws IOException {

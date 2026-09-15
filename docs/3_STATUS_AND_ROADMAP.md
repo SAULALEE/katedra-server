@@ -10,7 +10,7 @@ claridad qué funciona hoy y qué se ha dejado deliberadamente para después. Re
 
 ### Infraestructura
 - Spring Boot 4.0.6 sobre Java 21, monolito modular por capas.
-- MySQL 8.0 con migraciones Flyway. `ddl-auto=validate`, así que la app no arranca contra un
+- PostgreSQL con migraciones Flyway. `ddl-auto=validate`, así que la app no arranca contra un
   esquema que no coincide con las entidades.
 - Doppler para secretos de desarrollo; variables de entorno planas en producción.
 - Dockerfile multi-etapa corriendo como usuario no-root.

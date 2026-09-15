@@ -36,7 +36,7 @@ description: Git and branching workflow for server development
     | --- | --- | --- |
     | `feat` | New feature | `feat: add JWT authentication` |
     | `fix` | Bug fix | `fix: prevent token expiration error` |
-    | `chore` | Setup, dependencies, config | `chore: add MySQL driver dependency` |
+    | `chore` | Setup, dependencies, config | `chore: update PostgreSQL configuration` |
     | `refactor` | Code change without changing functionality | `refactor: simplify auth service logic` |
     | `test` | Add/modify tests | `test: add auth controller tests` |
     | `docs` | Documentation-only changes | `docs: update API endpoints reference` |
@@ -44,10 +44,11 @@ description: Git and branching workflow for server development
 - **Explicit Push Authorization:**
   - The AI agent must **never** run `git push` or upload any code/commits to the remote repository unless the human user has explicitly requested it in the chat interface.
 - **No AI as Commit Author or Co-Author:**
-  - AI agents (Claude, Codex, Antigravity, or any other) must **never** appear as the author, committer, or co-author of any commit in this repository, in any form.
-  - This means: no `Co-Authored-By:` trailer naming an AI or an AI vendor (including Anthropic, OpenAI, or any other), no AI identity in the `Author:`/`Committer:` git fields, and no AI attribution anywhere in the commit message body.
+  - AI agents (Claude, Claude Code, Codex, ChatGPT, GPT, Gemini, Antigravity, or any other) must **never** appear as the author, committer, or co-author of any commit in this repository, in any form.
+  - This means: no `Co-Authored-By:` trailer naming an AI, model, assistant, bot, or AI vendor (including Anthropic, OpenAI, Google, or any other), no AI identity in the `Author:`/`Committer:` git fields, and no AI attribution anywhere in the commit message body.
   - Every commit is authored solely by the human maintainer. This applies regardless of how much of the change an AI agent produced.
   - If an AI agent creates a commit on the human's behalf, it must use the human's configured git identity only, with a plain commit message following the `<type>: <summary>` format above — no attribution footer of any kind.
+  - Before committing, run `git config user.name`, `git config user.email`, and inspect the staged commit message to ensure no AI identity or attribution is present.
 
 ## 3. STANDARD OPERATING PROCEDURE (π_σ)
 1. **Alignment:** Identify which feature branch matches the requested task (e.g., login changes belong in `feature/auth`).

@@ -9,7 +9,7 @@ import java.sql.Date;
 import java.time.LocalDate;
 
 @Repository
-@Profile({"postgresql", "supabase"})
+@Profile({"postgresql", "supabase", "default"})
 public class PostgreSqlUsoDiarioUpsert implements UsoDiarioUpsert {
 
     private static final String SQL = """

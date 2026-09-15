@@ -9,7 +9,7 @@
 | Language | Java 21 |
 | Framework | Spring Boot 4.0.6 |
 | AI integration | Spring AI (`ChatClient`) over OpenAI |
-| Database | MySQL 8.0 |
+| Database | PostgreSQL |
 | Migrations | Flyway |
 | Payments | Stripe Subscriptions (Java SDK) |
 | Secrets | Doppler in development; plain environment variables in production |
@@ -26,7 +26,7 @@ deployable, one database, one transaction boundary.
 ### 2.1 Layers
 
 ```
-REST Controller  ──  DTO  ──  Service  ──  Entity  ──  Repository  ──  MySQL
+REST Controller  ──  DTO  ──  Service  ──  Entity  ──  Repository  ──  PostgreSQL
                                  │
                                  └──  ChatClient (Spring AI)  ──  OpenAI
 ```
@@ -37,7 +37,7 @@ Enforced boundaries:
    return DTOs, never entities.
 2. **Services** hold business logic, AI orchestration, and Entity↔DTO mapping.
 3. **Repositories** are Spring Data JPA interfaces. No business logic.
-4. **Entities** map to MySQL tables and never leave the service layer.
+4. **Entities** map to PostgreSQL tables and never leave the service layer.
 
 Errors are handled centrally by a `@RestControllerAdvice` global exception handler, so controllers
 contain no error-mapping code.
@@ -78,7 +78,7 @@ generation, exports, subscriptions, users, and the Stripe webhook. All routes si
 - **Flyway only.** Every schema change is a `V[Version]__[Description].sql` migration; there are
   no manual database interventions and `ddl-auto` is set to `validate`, so the application refuses
   to start if the schema and the entities disagree.
-- **Naming.** `snake_case` in MySQL, `camelCase` in Java. Domain vocabulary stays Spanish
+- **Naming.** `snake_case` in PostgreSQL, `camelCase` in Java. Domain vocabulary stays Spanish
   (`temario`, `asignatura`, `suscripcion`) because that is the language of the problem domain.
 
 ## 5. Billing and quota enforcement

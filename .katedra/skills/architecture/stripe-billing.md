@@ -19,7 +19,7 @@ Subscription lifecycle history. One row per subscription attempt. **Not soft-del
 | field | type | notes |
 |---|---|---|
 | `id` | UUID | Primary key |
-| `usuario_id` | CHAR(36) | Foreign key, plain column (not @ManyToOne) to survive soft-deleted users |
+| `usuario_id` | VARCHAR(36) | Foreign key, plain column (not @ManyToOne) to survive soft-deleted users |
 | `plan` | VARCHAR(50) enum | `PRO` only; FREE users have no row |
 | `ciclo` | VARCHAR(50) enum | `MENSUAL` \| `ANUAL` |
 | `estado` | VARCHAR(50) enum | `INCOMPLETA`, `ACTIVA`, `IMPAGA`, `CANCELADA` |
@@ -38,7 +38,7 @@ Daily quota tracking. **One row per (usuario_id, fecha) pair.** Implicitly rolls
 | field | type | notes |
 |---|---|---|
 | `id` | UUID | Primary key |
-| `usuario_id` | CHAR(36) | Foreign key |
+| `usuario_id` | VARCHAR(36) | Foreign key |
 | `fecha` | DATE | Which day (local time) |
 | `generaciones` | INT | Counter: 0–10 (FREE) or 0–100 (PRO) |
 | `exportaciones` | INT | Counter: 0–5 (FREE) or 0–100 (PRO) |
@@ -267,4 +267,4 @@ Webhook always returns 200 (even on processing error) to prevent retry storms.
 - [SuscripcionService.java](../../../src/main/java/Katedra/Server/service/SuscripcionService.java) — subscription lifecycle
 - [PlanLimitService.java](../../../src/main/java/Katedra/Server/service/PlanLimitService.java) — gates and quota
 - [StripeService.java](../../../src/main/java/Katedra/Server/service/StripeService.java) — Stripe wrapper
-- [Migrations V23–V25](../../../src/main/resources/db/migration/) — schema
+- [PostgreSQL migrations](../../../src/main/resources/db/migration-postgresql/) — schema

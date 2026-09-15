@@ -11,7 +11,7 @@ description: Backend architecture and modular monolith layered data flow
 
 ## 2. STRICT ARCHITECTURAL RULES (T_σ)
 - **Paradigm:** Layered Modular Monolith with integrated Spring AI.
-- **Data Flow:** `REST Controller` ↔ `DTO` ↔ `Service` (ChatClient.prompt) ↔ `OpenAI API` → structured JSON ↔ `Entity` ↔ `Repository` ↔ `MySQL`.
+- **Data Flow:** `REST Controller` ↔ `DTO` ↔ `Service` (ChatClient.prompt) ↔ `OpenAI API` → structured JSON ↔ `Entity` ↔ `Repository` ↔ `PostgreSQL`.
 - **Strict Boundaries:**
   - **Controllers:** Only handle HTTP requests/responses. Must accept and return ONLY Data Transfer Objects (DTOs), never JPA Entities.
   - **Services:** Contain core business logic and AI orchestration. Responsible for mapping between Entities and DTOs. Use ChatClient for LLM calls.

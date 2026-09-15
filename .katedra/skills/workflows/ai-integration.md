@@ -44,7 +44,7 @@ description: AI prompt engineering and structured content generation guidelines
    ```
 5. **Response Parsing:** Parse JSON response into Spring DTOs. Validate required fields exist.
 6. **Error Handling:** Catch exceptions. Log and return graceful error to client (not raw 500).
-7. **Persistence:** Save validated content to MySQL via JPA Repository.
+7. **Persistence:** Save validated content to PostgreSQL via JPA Repository.
 
 ## 4. COMPACT RECIPE (FEW-SHOT)
 Input: "Create a system to generate 3 multiple choice questions from a syllabus (using Spring AI)"

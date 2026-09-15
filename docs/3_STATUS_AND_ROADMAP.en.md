@@ -10,7 +10,7 @@ had drifted badly out of date.
 
 ### Infrastructure
 - Spring Boot 4.0.6 on Java 21, layered modular monolith.
-- MySQL 8.0 with Flyway migrations. `ddl-auto=validate`, so the app will not start against a
+- PostgreSQL with Flyway migrations. `ddl-auto=validate`, so the app will not start against a
   schema that disagrees with the entities.
 - Doppler for development secrets; plain environment variables in production.
 - Multi-stage Dockerfile running as a non-root user.

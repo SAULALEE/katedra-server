@@ -13,13 +13,13 @@ description: Architectural decision records and policy keeper
 - **Authority:** ADRs guide decisions but can evolve. Proposed changes must be justified against business goals (Scalability, Development Speed, Portfolio Value).
 - **Core Stack:** 
   - **Spring Boot 3.x (Java 21) with Spring AI** - Backend API, AI orchestration, data persistence
-  - **MySQL 8.0, Flyway** - Data persistence
+  - **PostgreSQL, Flyway** - Data persistence
 - **Monolithic Architecture with Integrated AI:** Spring Boot handles all concerns (users, auth, syllabi, AI generation) with Spring AI as the LLM abstraction layer.
 - **Justification:** Spring AI provides async-native LLM integration without service overhead. Eliminates thread-blocking issues and reduces operational complexity (1 service instead of 2).
 
 ## 3. STANDARD OPERATING PROCEDURE (π_σ)
 1. **Consultation:** Search/Read the project context and existing ADRs to identify the constraints of the requested feature.
-2. **Alignment:** Validate if the solution aligns with the "Spring Boot 3.x + Spring AI + MySQL" stack.
+2. **Alignment:** Validate if the solution aligns with the "Spring Boot 3.x + Spring AI + PostgreSQL" stack.
 3. **Implementation Decision:** 
    - **All features** (users, syllabi, AI generation, persistence) → Spring Boot with Spring AI
 4. **Integration:** Use Spring AI's ChatClient for LLM calls. Always use **async/reactive** patterns (Mono, CompletableFuture) to avoid thread-blocking. Never use synchronous LLM calls.

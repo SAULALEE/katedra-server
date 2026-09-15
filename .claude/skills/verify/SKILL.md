@@ -10,7 +10,7 @@ Two sibling repos: this one (`katedra-server`, Spring Boot API) and
 
 ## Launch
 
-- MySQL: `docker start katedra_db` if not already running (container may
+- PostgreSQL: `docker start katedra_db` if not already running (container may
   already be up — check `docker ps`).
 - Backend: `doppler run -- ./mvnw -q spring-boot:run` from `katedra-server/`.
   Boots on `:8080`, context path `/api/v1`. Watch the log for

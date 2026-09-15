@@ -9,7 +9,7 @@
 | Lenguaje | Java 21 |
 | Framework | Spring Boot 4.0.6 |
 | Integración de IA | Spring AI (`ChatClient`) sobre OpenAI |
-| Base de datos | MySQL 8.0 |
+| Base de datos | PostgreSQL |
 | Migraciones | Flyway |
 | Pagos | Stripe Subscriptions (SDK de Java) |
 | Secretos | Doppler en desarrollo; variables de entorno planas en producción |
@@ -26,7 +26,7 @@ servicios — un solo desplegable, una sola base de datos, un solo límite trans
 ### 2.1 Capas
 
 ```
-Controlador REST  ──  DTO  ──  Service  ──  Entity  ──  Repository  ──  MySQL
+Controlador REST  ──  DTO  ──  Service  ──  Entity  ──  Repository  ──  PostgreSQL
                                   │
                                   └──  ChatClient (Spring AI)  ──  OpenAI
 ```
@@ -38,7 +38,7 @@ Límites aplicados:
 2. Los **services** contienen la lógica de negocio, la orquestación de IA, y el mapeo
    Entity↔DTO.
 3. Los **repositories** son interfaces de Spring Data JPA. Sin lógica de negocio.
-4. Las **entities** mapean a tablas de MySQL y nunca salen de la capa de servicio.
+4. Las **entities** mapean a tablas de PostgreSQL y nunca salen de la capa de servicio.
 
 Los errores se manejan de forma centralizada mediante un manejador global de excepciones
 `@RestControllerAdvice`, así que los controladores no contienen código de mapeo de errores.
@@ -82,7 +82,7 @@ viven bajo el path de contexto `/api/v1`.
 - **Solo Flyway.** Cada cambio de esquema es una migración `V[Version]__[Descripción].sql`; no
   hay intervenciones manuales en la base de datos y `ddl-auto` está en `validate`, así que la
   aplicación se niega a arrancar si el esquema y las entidades no coinciden.
-- **Nomenclatura.** `snake_case` en MySQL, `camelCase` en Java. El vocabulario de dominio se
+- **Nomenclatura.** `snake_case` en PostgreSQL, `camelCase` en Java. El vocabulario de dominio se
   mantiene en español (`temario`, `asignatura`, `suscripcion`) porque ese es el idioma del
   dominio del problema.
 

@@ -1,35 +1,32 @@
-# Local Katedra stack: MySQL + the API.
+# Local Katedra stack: PostgreSQL + the API.
 #
 #   ./scripts/local-stack.sh up      # Doppler local -> database + API
 #                                    # http://localhost:8080/api/v1
 #
 # To run only the database and start the API from your IDE or ./mvnw instead:
 #
-#   doppler run --project katedra-server --config local -- docker compose up -d mysql
+#   doppler run --project katedra-server --config local -- docker compose up -d postgres
 #
 # This file intentionally has no fallback credentials. Always invoke Compose through
 # Doppler's `local` configuration.
 
 services:
-  mysql:
-    image: mysql:8.0
+  postgres:
+    image: postgres:17-alpine
     container_name: katedra_db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be provided by Doppler}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE must be provided by Doppler}
-      MYSQL_USER: ${DB_USER:?DB_USER must be provided by Doppler}
-      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be provided by Doppler}
+      POSTGRES_DB: ${POSTGRES_DB_NAME:?POSTGRES_DB_NAME must be provided by Doppler}
+      POSTGRES_USER: ${POSTGRES_DB_USER:?POSTGRES_DB_USER must be provided by Doppler}
+      POSTGRES_PASSWORD: ${POSTGRES_DB_PASSWORD:?POSTGRES_DB_PASSWORD must be provided by Doppler}
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - katedra_data:/var/lib/mysql
+      - katedra_postgres_data:/var/lib/postgresql/data
     networks:
       - katedra_network
     healthcheck:
-      # The API's depends_on waits on this, so it must prove the server accepts
-      # authenticated connections, not merely that the process is up.
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be provided by Doppler}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -40,16 +37,13 @@ services:
     container_name: katedra_server
     restart: unless-stopped
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:?SPRING_PROFILES_ACTIVE must be provided by Doppler}
-      # Host is `mysql`, not localhost: inside the compose network the database is
-      # reached by service name. This is why DB_URL is set here rather than inherited
-      # from a local file.
-      DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:?MYSQL_DATABASE must be provided by Doppler}
-      DB_USER: ${DB_USER:?DB_USER must be provided by Doppler}
-      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be provided by Doppler}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-postgresql}
+      POSTGRES_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB_NAME:?POSTGRES_DB_NAME must be provided by Doppler}
+      POSTGRES_DB_USER: ${POSTGRES_DB_USER:?POSTGRES_DB_USER must be provided by Doppler}
+      POSTGRES_DB_PASSWORD: ${POSTGRES_DB_PASSWORD:?POSTGRES_DB_PASSWORD must be provided by Doppler}
 
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be provided by Doppler}
       JWT_EXPIRATION: ${JWT_EXPIRATION:?JWT_EXPIRATION must be provided by Doppler}
@@ -87,4 +81,4 @@ networks:
     driver: bridge
 
 volumes:
-  katedra_data:
+  katedra_postgres_data:

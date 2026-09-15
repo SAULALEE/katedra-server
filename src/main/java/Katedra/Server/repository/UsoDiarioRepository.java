@@ -40,7 +40,7 @@ public interface UsoDiarioRepository extends JpaRepository<UsoDiario, String> {
      * Refunds quota reserved for AI pieces that ultimately failed.
      *
      * <p>CASE and not GREATEST: GREATEST is not portable JPQL, and this has to run on both
-     * MySQL and H2. The clamp at 0 guards against a double refund leaving a negative
+     * PostgreSQL and H2. The clamp at 0 guards against a double refund leaving a negative
      * counter, which would silently hand the user free quota tomorrow.
      */
     @Modifying

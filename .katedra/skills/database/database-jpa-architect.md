@@ -10,11 +10,11 @@ description: Database architecture, JPA mapping rules, and Flyway migrations
 - **Exclusion:** Does not handle REST routing (use `architecture.md`).
 
 ## 2. STRICT ARCHITECTURAL RULES (T_σ)
-- **Database Engine:** MySQL 8.0.
+- **Database Engine:** PostgreSQL.
 - **Naming Conventions:**
   - **Database:** `snake_case` for all table names and column names (e.g., `temarios_conceptos`, `deleted_at`).
   - **Java Entities:** `camelCase` for fields, PascalCase for Class names (e.g., `TemarioConcepto`).
-- **Primary Keys:** Always use UUIDs stored as `CHAR(36)`.
+- **Primary Keys:** Always use UUIDs stored as `VARCHAR(36)`.
   - **Java Mapping:**
     ```java
     @Id
@@ -32,13 +32,13 @@ description: Database architecture, JPA mapping rules, and Flyway migrations
 - **JPA Relationships:**
   - Avoid `FetchType.EAGER` unless strictly required. Default to `FetchType.LAZY` for all `@ManyToOne`, `@OneToOne`, and `@OneToMany` annotations to prevent N+1 select queries.
   - Always map foreign keys explicitly.
-- **Migrations:** All schema changes must be declared using Flyway migration scripts named according to the pattern `V[Version]__[Description].sql` under `src/main/resources/db/migration/`. No direct DB manual interventions.
+- **Migrations:** All PostgreSQL schema changes must be declared using Flyway migration scripts under `src/main/resources/db/migration-postgresql/`. No direct DB manual interventions.
 
 ## 3. STANDARD OPERATING PROCEDURE (π_σ)
-1. **Flyway Migration:** Write the SQL migration file. Ensure UUID fields are defined as `CHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`.
+1. **Flyway Migration:** Write the SQL migration file. Ensure UUID fields are defined as `VARCHAR(36)`.
 2. **JPA Entity Creation:**
    - Define fields, relationships, and soft-delete SQL updates.
-   - Match MySQL table and column names exactly using `@Table` and `@Column`.
+   - Match PostgreSQL table and column names exactly using `@Table` and `@Column`.
 3. **Repository Definition:** Create the Spring Data JPA interface extending `JpaRepository<Entity, String>`. Use Query methods or `@Query` annotations for custom lookups.
 4. **DTO and Mapping:** Construct the matching Request/Response DTOs and implement mapper logic in the service layer.
 
@@ -46,16 +46,16 @@ description: Database architecture, JPA mapping rules, and Flyway migrations
 Input: "Add a database table and JPA entity for 'Modulo' with soft deletes and UUID"
 Output Expected:
 ```sql
--- 1. Flyway: src/main/resources/db/migration/V2__create_modulo_table.sql
+-- 1. Flyway: src/main/resources/db/migration-postgresql/V26__create_modulo_table.sql
 CREATE TABLE modulo (
-    id CHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    id VARCHAR(36) NOT NULL,
     nombre VARCHAR(255) NOT NULL,
     descripcion TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL DEFAULT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITHOUT TIME ZONE,
     PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
 ```
 
 ```java

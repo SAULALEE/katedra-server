@@ -7,10 +7,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
-import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.test.context.ActiveProfiles;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -24,23 +26,22 @@ import static org.assertj.core.api.Assertions.assertThat;
  * cannot verify: that "0 affected rows" is a reliable rejection signal, and that the limit
  * check inside the WHERE clause really is atomic with the increment.
  *
- * <p>The shared test properties disable Flyway and set ddl-auto=none, so this class
- * overrides them to generate the schema from the entities. That is also a second,
- * independent check that the entity mapping is self-consistent.
- *
- * <p>{@code @AutoConfigureTestDatabase(replace = NONE)} is required, not cosmetic:
- * {@code @DataJpaTest} otherwise swaps in its own embedded datasource and silently drops
- * the {@code MODE=MySQL} from the configured URL, which makes the MySQL-dialect upsert
- * fail to parse.
+ * <p>Runs on PostgreSQL because the upsert uses {@code ON CONFLICT}; H2 cannot model
+ * that contract accurately enough for quota accounting.
  */
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(MySqlUsoDiarioUpsert.class)
-@TestPropertySource(properties = {
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.flyway.enabled=false"
+@SpringBootTest(properties = {
+        "spring.flyway.enabled=true",
+        "spring.flyway.locations=classpath:db/migration-postgresql",
+        "spring.jpa.hibernate.ddl-auto=validate",
+        "spring.datasource.hikari.maximum-pool-size=16"
 })
+@ActiveProfiles("postgresql")
+@Testcontainers(disabledWithoutDocker = true)
 class UsoDiarioRepositoryTest {
+
+    @Container
+    @ServiceConnection
+    static final PostgreSQLContainer POSTGRESQL = new PostgreSQLContainer("postgres:17-alpine");
 
     @Autowired
     private UsoDiarioRepository usoDiarioRepository;
@@ -56,7 +57,11 @@ class UsoDiarioRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        Usuario usuario = new Usuario("docente@katedra.test", "hash", "Docente", RolUsuario.ROLE_PROFESOR);
+        Usuario usuario = new Usuario(
+                "docente-" + UUID.randomUUID() + "@katedra.test",
+                "hash",
+                "Docente",
+                RolUsuario.ROLE_PROFESOR);
         usuarioId = usuarioRepository.save(usuario).getId();
     }
 
@@ -70,6 +75,12 @@ class UsoDiarioRepositoryTest {
                 .orElseThrow();
     }
 
+    private long filasDeHoy() {
+        return usoDiarioRepository.findAll().stream()
+                .filter(uso -> usuarioId.equals(uso.getUsuarioId()) && hoy.equals(uso.getFecha()))
+                .count();
+    }
+
     @Test
     @DisplayName("crearFilaSiNoExiste is idempotent: a second call does not duplicate or reset the row")
     void crearFilaSiNoExisteEsIdempotente() {
@@ -81,7 +92,7 @@ class UsoDiarioRepositoryTest {
         crearFilaDeHoy();
 
         assertThat(generacionesDeHoy()).isEqualTo(4);
-        assertThat(usoDiarioRepository.findAll()).hasSize(1);
+        assertThat(filasDeHoy()).isEqualTo(1);
     }
 
     @Test

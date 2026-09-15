@@ -3,6 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 action="${1:-up}"
+doppler_config="${DOPPLER_CONFIG:-dev}"
 
 if docker compose version >/dev/null 2>&1; then
   compose=(docker compose)
@@ -15,13 +16,13 @@ fi
 
 case "$action" in
   up)
-    exec doppler run --project katedra-server --config local -- "${compose[@]}" up -d --build
+    exec doppler run --project katedra-server --config "$doppler_config" -- "${compose[@]}" up -d --build
     ;;
   down)
-    exec doppler run --project katedra-server --config local -- "${compose[@]}" down
+    exec doppler run --project katedra-server --config "$doppler_config" -- "${compose[@]}" down
     ;;
   logs)
-    exec doppler run --project katedra-server --config local -- "${compose[@]}" logs -f server
+    exec doppler run --project katedra-server --config "$doppler_config" -- "${compose[@]}" logs -f server
     ;;
   *)
     printf 'Usage: %s {up|down|logs}\n' "$0" >&2

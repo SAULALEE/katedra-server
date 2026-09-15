@@ -6,7 +6,7 @@
 Backend de **Katedra**, un generador de contenido académico impulsado por IA para
 profesores. Se le da un temario —escrito a mano, subido en archivo o desde una URL— y genera
 la estructura, la teoría, un examen y diapositivas, usando llamadas reales a OpenAI a través
-de Spring AI. Spring Boot 4, Java 21, MySQL 8, facturación con Stripe.
+de Spring AI. Spring Boot 4, Java 21, PostgreSQL, facturación con Stripe.
 
 Versión en inglés: [README.en.md](README.en.md) · Frontend: [katedra-client](https://github.com/SAULALEE/katedra-client)
 
@@ -41,7 +41,7 @@ flowchart LR
         Service --> AI["Spring AI ChatClient"]
         Service --> Stripe["Stripe SDK"]
     end
-    Repo --> DB[(MySQL 8)]
+    Repo --> DB[(PostgreSQL)]
     AI --> OpenAI[("OpenAI\ngpt-4.1-mini / o4-mini")]
     Stripe --> StripeAPI[("Stripe API")]
 ```
@@ -58,7 +58,7 @@ la capa de servicio, todas las llamadas a IA y Stripe son asíncronas. Detalles 
 |---|---|
 | Lenguaje / framework | Java 21, Spring Boot 4.0.6 |
 | IA | Spring AI `ChatClient` → OpenAI (`gpt-4.1-mini` / `o4-mini`) |
-| Base de datos | MySQL 8.0 local / PostgreSQL de Supabase, migraciones Flyway |
+| Base de datos | PostgreSQL local / PostgreSQL de Supabase, migraciones Flyway |
 | Autenticación | JWT sin estado, OAuth2 opcional (Google/Microsoft) |
 | Facturación | Stripe Subscriptions |
 | Tests | JUnit 5, Mockito, AssertJ, `@WebMvcTest` — 336 tests |
@@ -95,7 +95,7 @@ demás funciona con la facturación en blanco.
 
 ### Modos de ejecución
 
-`local` usa backend local y MySQL local en Docker. `production` usa el perfil Supabase; el
+`local` usa backend local y PostgreSQL local en Docker. `production` usa el perfil Supabase; el
 backend alojado se utiliza desde el cliente con `npm run dev:production`.
 
 Para ejecutar el backend local conectado a Supabase:
@@ -104,15 +104,15 @@ Para ejecutar el backend local conectado a Supabase:
 ./scripts/run-production.sh
 ```
 
-Las configuraciones Doppler requeridas son `local` y `production`. `local` debe contener
-`SPRING_PROFILES_ACTIVE=mysql`, credenciales MySQL y las variables del API local. `production`
-debe contener `SPRING_PROFILES_ACTIVE=supabase`, `SUPABASE_DB_*` y las credenciales de
-producción. Flyway usa `src/main/resources/db/migration-postgresql/B25__baseline_katedra_postgresql.sql`
-en el perfil Supabase.
+Las configuraciones Doppler requeridas son `dev` y `prd`. `dev` debe contener
+`SPRING_PROFILES_ACTIVE=postgresql`, `POSTGRES_DB_NAME`, `POSTGRES_DB_USER`,
+`POSTGRES_DB_PASSWORD` y las variables del API local. `prd` debe contener
+`SPRING_PROFILES_ACTIVE=supabase`, `SUPABASE_DB_*` y las credenciales de producción. Flyway usa
+`src/main/resources/db/migration-postgresql/B25__baseline_katedra_postgresql.sql`.
 
 ### Ejecutar sin Docker
 
-Para iniciar únicamente el backend local contra un MySQL ya disponible:
+Para iniciar únicamente el backend local contra un PostgreSQL ya disponible:
 
 ```bash
 ./scripts/run-local.sh
