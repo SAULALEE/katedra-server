@@ -44,7 +44,7 @@ public class AuthService {
             request.email(),
             passwordEncoder.encode(request.password()),
             request.nombre(),
-            resolveRoleByEmail(request.email())
+            RolUsuario.ROLE_PROFESOR
         );
 
         usuarioRepository.save(usuario);
@@ -154,16 +154,8 @@ public class AuthService {
         usuario.setNombre(nombre != null && !nombre.isBlank() ? nombre : email);
         usuario.setAuthProvider(authProvider);
         usuario.setProviderUserId(providerUserId);
-        usuario.setRol(authProvider == AuthProvider.GOOGLE
-                ? RolUsuario.ROLE_PROFESOR
-                : resolveRoleByEmail(email));
+        usuario.setRol(RolUsuario.ROLE_PROFESOR);
         return usuarioRepository.save(usuario);
-    }
-
-    private RolUsuario resolveRoleByEmail(String email) {
-        return email != null && email.toLowerCase().endsWith("@katedra.com")
-                ? RolUsuario.ROLE_ADMIN
-                : RolUsuario.ROLE_PROFESOR;
     }
 
     private UsuarioDTO mapToDTO(Usuario usuario) {

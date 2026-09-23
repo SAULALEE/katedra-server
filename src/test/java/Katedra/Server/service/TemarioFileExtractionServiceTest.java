@@ -6,6 +6,7 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -18,6 +19,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class TemarioFileExtractionServiceTest {
+
+    private static final int MAX_FILE_BYTES = 10 * 1024 * 1024;
+    private static final int MAX_EXTRACTED_CHARACTERS = 50000;
 
     private final TemarioFileExtractionService service = new TemarioFileExtractionService();
 
@@ -85,7 +89,96 @@ class TemarioFileExtractionServiceTest {
     }
 
     @Test
+    void shouldRejectFileLargerThanTenMegabytes() {
+        var file = new MockMultipartFile(
+                "file", "temario.md", "text/markdown", new byte[MAX_FILE_BYTES + 1]);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> service.extract(file));
+
+        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(exception.getReason()).isEqualTo("El archivo no puede superar 10 MB");
+    }
+
+    @Test
+    void shouldRejectContentThatDoesNotMatchExtension() {
+        var file = new MockMultipartFile(
+                "file", "temario.pdf", "application/pdf",
+                "Esto es texto plano, no un PDF".getBytes(StandardCharsets.UTF_8));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> service.extract(file));
+
+        assertThat(exception.getReason()).isEqualTo("El tipo MIME no coincide con la extension");
+    }
+
+    @Test
+    void shouldRejectDeclaredMimeTypeThatDoesNotMatchExtension() {
+        var file = new MockMultipartFile(
+                "file", "temario.md", "application/pdf",
+                "# Temario válido".getBytes(StandardCharsets.UTF_8));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> service.extract(file));
+
+        assertThat(exception.getReason()).isEqualTo("El tipo MIME no coincide con la extension");
+    }
+
+    @Test
+    void shouldLimitExtractedMarkdownText() {
+        var file = new MockMultipartFile(
+                "file", "temario.md", "text/markdown",
+                "a".repeat(MAX_EXTRACTED_CHARACTERS + 1000).getBytes(StandardCharsets.UTF_8));
+
+        var extracted = service.extract(file);
+
+        assertThat(extracted.text()).hasSize(MAX_EXTRACTED_CHARACTERS);
+    }
+
+    @Test
+    void shouldRejectMarkdownWithInvalidUtf8() {
+        var file = new MockMultipartFile(
+                "file", "temario.md", "text/markdown", new byte[]{(byte) 0xc3, (byte) 0x28});
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> service.extract(file));
+
+        assertThat(exception.getReason()).isEqualTo("El archivo Markdown debe usar UTF-8 valido");
+    }
+
+    @Test
+    void shouldRejectMarkdownContainingBinaryControlCharacters() {
+        var file = new MockMultipartFile(
+                "file", "temario.md", "text/markdown",
+                new byte[]{'T', 'e', 'x', 't', 'o', 0, 1});
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> service.extract(file));
+
+        assertThat(exception.getReason()).isEqualTo("El archivo Markdown no contiene texto valido");
+    }
+
+    @Test
+    void shouldLimitTextExtractedFromDocx() throws Exception {
+        String longText = "contenido-academico ".repeat(4000);
+        var file = new MockMultipartFile(
+                "file", "temario.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                createDocx(longText));
+
+        var extracted = service.extract(file);
+
+        assertThat(extracted.text()).hasSizeLessThanOrEqualTo(MAX_EXTRACTED_CHARACTERS);
+    }
+
+    @Test
     void shouldExtractDocxContent() throws Exception {
+        var file = new MockMultipartFile(
+                "file", "temario.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                createDocx("Temario de estructuras de datos"));
+
+        var extracted = service.extract(file);
+
+        assertThat(extracted.text()).contains("Temario de estructuras de datos");
+    }
+
+    private byte[] createDocx(String text) throws Exception {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(output)) {
             writeEntry(zip, "[Content_Types].xml", """
@@ -105,18 +198,11 @@ class TemarioFileExtractionServiceTest {
             writeEntry(zip, "word/document.xml", """
                     <?xml version="1.0" encoding="UTF-8"?>
                     <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-                      <w:body><w:p><w:r><w:t>Temario de estructuras de datos</w:t></w:r></w:p></w:body>
+                      <w:body><w:p><w:r><w:t>%s</w:t></w:r></w:p></w:body>
                     </w:document>
-                    """);
+                    """.formatted(text));
         }
-        var file = new MockMultipartFile(
-                "file", "temario.docx",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                output.toByteArray());
-
-        var extracted = service.extract(file);
-
-        assertThat(extracted.text()).contains("Temario de estructuras de datos");
+        return output.toByteArray();
     }
 
     private void writeEntry(ZipOutputStream zip, String name, String content) throws Exception {

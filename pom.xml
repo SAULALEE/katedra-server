@@ -99,6 +99,11 @@
 			<artifactId>jsoup</artifactId>
 			<version>1.21.1</version>
 		</dependency>
+		<dependency>
+			<groupId>com.squareup.okhttp3</groupId>
+			<artifactId>okhttp</artifactId>
+			<version>4.12.0</version>
+		</dependency>
 		<!-- stripe-java: Free/Pro subscription billing. Not managed by the Spring Boot BOM,
 		     so the version is pinned explicitly like the other third-party libraries here.
 		     The SDK version determines the pinned Stripe API version, which in turn decides

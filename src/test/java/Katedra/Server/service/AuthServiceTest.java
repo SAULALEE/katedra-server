@@ -72,6 +72,22 @@ class AuthServiceTest {
     }
 
     @Test
+    void shouldRegisterKatedraEmailAsProfesor() {
+        AuthRegisterRequestDTO request = new AuthRegisterRequestDTO(
+                "public-user@katedra.com", "fuego123", "Public User");
+        given(usuarioRepository.findByEmail(request.email())).willReturn(Optional.empty());
+        given(passwordEncoder.encode(request.password())).willReturn("encoded_fuego123");
+        given(jwtService.generateToken(any(Usuario.class))).willReturn("mocked_jwt_token");
+
+        AuthResponseDTO response = authService.register(request);
+
+        ArgumentCaptor<Usuario> captor = ArgumentCaptor.forClass(Usuario.class);
+        verify(usuarioRepository).save(captor.capture());
+        assertThat(captor.getValue().getRol()).isEqualTo(RolUsuario.ROLE_PROFESOR);
+        assertThat(response.usuario().rol()).isEqualTo(RolUsuario.ROLE_PROFESOR);
+    }
+
+    @Test
     void shouldThrowExceptionWhenRegisteringExistingEmail() {
         // Arrange
         AuthRegisterRequestDTO request = new AuthRegisterRequestDTO("test@cueva.com", "fuego123", "Grog");
@@ -138,6 +154,23 @@ class AuthServiceTest {
         assertThat(captor.getValue().getProviderUserId()).isEqualTo("google-123");
         assertThat(captor.getValue().getRol()).isEqualTo(RolUsuario.ROLE_PROFESOR);
         assertThat(response.token()).isEqualTo("google_jwt");
+    }
+
+    @Test
+    void shouldCreateMicrosoftUserAsProfesor() {
+        given(usuarioRepository.findByAuthProviderAndProviderUserId(AuthProvider.MICROSOFT, "microsoft-123"))
+                .willReturn(Optional.empty());
+        given(usuarioRepository.findByEmail("teacher@katedra.com")).willReturn(Optional.empty());
+        given(usuarioRepository.save(any(Usuario.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(jwtService.generateToken(any(Usuario.class))).willReturn("microsoft_jwt");
+
+        AuthResponseDTO response = authService.loginOrRegisterSocial(
+                AuthProvider.MICROSOFT, "microsoft-123", "teacher@katedra.com", "Teacher");
+
+        ArgumentCaptor<Usuario> captor = ArgumentCaptor.forClass(Usuario.class);
+        verify(usuarioRepository).save(captor.capture());
+        assertThat(captor.getValue().getRol()).isEqualTo(RolUsuario.ROLE_PROFESOR);
+        assertThat(response.usuario().rol()).isEqualTo(RolUsuario.ROLE_PROFESOR);
     }
 
     @Test

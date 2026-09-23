@@ -20,7 +20,7 @@ services:
       POSTGRES_USER: ${POSTGRES_DB_USER:?POSTGRES_DB_USER must be provided by Doppler}
       POSTGRES_PASSWORD: ${POSTGRES_DB_PASSWORD:?POSTGRES_DB_PASSWORD must be provided by Doppler}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - katedra_postgres_data:/var/lib/postgresql/data
     networks:
