@@ -1,6 +1,6 @@
 package Katedra.Server.config;
 
-import Katedra.Server.model.ModeloIA;
+import Katedra.Server.teacher.model.ModeloIA;
 import org.springframework.ai.openai.OpenAiChatOptions;
 
 /**

@@ -1,5 +1,7 @@
 package Katedra.Server.model;
 
+import Katedra.Server.teacher.model.HistorialEvento;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

@@ -1,10 +1,10 @@
 package Katedra.Server.service;
 
 import Katedra.Server.dto.UsoPlanResponseDTO;
-import Katedra.Server.model.FormatoExportacion;
-import Katedra.Server.model.ModeloIA;
-import Katedra.Server.model.OrigenTemario;
-import Katedra.Server.model.PiezaMaterial;
+import Katedra.Server.teacher.model.FormatoExportacion;
+import Katedra.Server.teacher.model.ModeloIA;
+import Katedra.Server.teacher.model.OrigenTemario;
+import Katedra.Server.teacher.model.PiezaMaterial;
 import Katedra.Server.model.PlanUsuario;
 import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.Usuario;

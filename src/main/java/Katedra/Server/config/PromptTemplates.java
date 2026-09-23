@@ -1,7 +1,7 @@
 package Katedra.Server.config;
 
-import Katedra.Server.model.ModeloIA;
-import Katedra.Server.model.NivelAcademico;
+import Katedra.Server.teacher.model.ModeloIA;
+import Katedra.Server.teacher.model.NivelAcademico;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;

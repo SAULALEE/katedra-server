@@ -1,7 +1,7 @@
 package Katedra.Server.config;
 
-import Katedra.Server.model.ModeloIA;
-import Katedra.Server.model.NivelAcademico;
+import Katedra.Server.teacher.model.ModeloIA;
+import Katedra.Server.teacher.model.NivelAcademico;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

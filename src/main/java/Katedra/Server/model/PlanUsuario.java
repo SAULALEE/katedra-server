@@ -1,5 +1,11 @@
 package Katedra.Server.model;
 
+import Katedra.Server.teacher.model.PiezaMaterial;
+
+import Katedra.Server.teacher.model.ModeloIA;
+
+import Katedra.Server.teacher.model.FormatoExportacion;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
