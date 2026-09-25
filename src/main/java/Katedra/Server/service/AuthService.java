@@ -36,15 +36,23 @@ public class AuthService {
     }
 
     public AuthResponseDTO register(AuthRegisterRequestDTO request) {
+        return registerWithRole(request, resolveRoleByEmail(request.email()));
+    }
+
+    public AuthResponseDTO registerStudent(AuthRegisterRequestDTO request) {
+        return registerWithRole(request, RolUsuario.ROLE_ALUMNO);
+    }
+
+    private AuthResponseDTO registerWithRole(AuthRegisterRequestDTO request, RolUsuario role) {
         if (usuarioRepository.findByEmail(request.email()).isPresent()) {
-            throw new RuntimeException("El email ya está registrado");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El email ya está registrado");
         }
 
         Usuario usuario = new Usuario(
             request.email(),
             passwordEncoder.encode(request.password()),
             request.nombre(),
-            resolveRoleByEmail(request.email())
+            role
         );
 
         usuarioRepository.save(usuario);

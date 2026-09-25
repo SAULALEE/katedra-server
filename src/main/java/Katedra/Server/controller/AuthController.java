@@ -7,8 +7,8 @@ import Katedra.Server.service.AuthService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
-import org.springframework.web.bind.annotation.CrossOrigin;
 
 /**
  * REST Controller to handle user authentication endpoints.
@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.CrossOrigin;
  */
 @RestController
 @RequestMapping("/auth")
-@CrossOrigin(origins = "*")
 public class AuthController {
 
     private final AuthService authService;
@@ -32,8 +31,13 @@ public class AuthController {
      * @return a response entity containing the signed JWT token and user profile details
      */
     @PostMapping("/register")
-    public ResponseEntity<AuthResponseDTO> register(@RequestBody AuthRegisterRequestDTO request) {
+    public ResponseEntity<AuthResponseDTO> register(@Valid @RequestBody AuthRegisterRequestDTO request) {
         return ResponseEntity.ok(authService.register(request));
+    }
+
+    @PostMapping("/students/register")
+    public ResponseEntity<AuthResponseDTO> registerStudent(@Valid @RequestBody AuthRegisterRequestDTO request) {
+        return ResponseEntity.ok(authService.registerStudent(request));
     }
 
     /**
@@ -43,7 +47,7 @@ public class AuthController {
      * @return a response entity containing the signed JWT token and user profile details
      */
     @PostMapping("/login")
-    public ResponseEntity<AuthResponseDTO> login(@RequestBody AuthLoginRequestDTO request) {
+    public ResponseEntity<AuthResponseDTO> login(@Valid @RequestBody AuthLoginRequestDTO request) {
         return ResponseEntity.ok(authService.login(request));
     }
 

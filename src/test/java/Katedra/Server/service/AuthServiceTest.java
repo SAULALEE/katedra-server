@@ -79,11 +79,11 @@ class AuthServiceTest {
         given(usuarioRepository.findByEmail(request.email())).willReturn(Optional.of(existingUser));
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
             authService.register(request);
         });
 
-        assertThat(exception.getMessage()).isEqualTo("El email ya está registrado");
+        assertThat(exception.getReason()).isEqualTo("El email ya está registrado");
     }
 
     @Test
