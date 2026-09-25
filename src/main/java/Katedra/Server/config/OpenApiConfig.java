@@ -42,7 +42,7 @@ public class OpenApiConfig {
     // auth, this only decides whether Swagger UI shows a lock icon and sends a bearer token.
     // Springdoc paths are omitted — they document the API, they aren't part of it.
     private static final Set<String> PUBLIC_PATHS = Set.of(
-            "/auth/register", "/auth/login", "/auth/logout", "/auth/google", "/auth/microsoft",
+            "/auth/register", "/auth/students/register", "/auth/login", "/auth/logout", "/auth/google", "/auth/microsoft",
             "/webhooks/stripe", "/suscripciones/planes"
     );
 

@@ -10,7 +10,7 @@ description: System context and backend technology stack
 - **Exclusion:** Does not handle specific architectural data flows (use `architecture.md`) or database schema details (use `database-jpa-architect.md`).
 
 ## 2. STRICT BUSINESS & TECH RULES (T_σ)
-- **Product Scope:** Katedra connects teacher preparation with a student learning journey. The teacher authoring/generation experience is implemented. The student experience is defined in the client landing and requirements document; class sharing and student-facing backend workflows are planned, not yet implemented.
+- **Product Scope:** Katedra connects teacher preparation with a student learning journey. Teacher authoring/generation and student account registration/login are implemented. Class sharing and student learning APIs remain planned.
 - **Teacher Experience:** The existing AI-driven workflow turns a structured syllabus into theory, evaluations, and presentation slides using Spring AI. Class publishing/sharing is future work.
 - **Student Experience:** The intended class journey is class → topic/material → activity → response → teacher feedback → next step. AI may clarify prompts or feedback and suggest practice; it must not submit work, change grades, or bypass teacher-defined attempt rules.
 - **Target Users:** Teachers preparing learning materials and, when class sharing is implemented, students studying and responding within shared classes.
