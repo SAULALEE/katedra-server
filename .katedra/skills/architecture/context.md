@@ -10,9 +10,11 @@ description: System context and backend technology stack
 - **Exclusion:** Does not handle specific architectural data flows (use `architecture.md`) or database schema details (use `database-jpa-architect.md`).
 
 ## 2. STRICT BUSINESS & TECH RULES (T_σ)
-- **Core App Functionality:** Katedra is an **AI-driven academic content generator**. Its primary engine takes a structured syllabus and automatically creates complete educational materials (theory, practical exercises, evaluations, and presentation slides) using LLMs. 
-- **Target Audience:** Teachers (designed specifically to save 30-40% of manual preparation time).
-- **Backend Stack:** Spring Boot 3.x (Java 21) with Spring AI, Modular Monolith architecture.
+- **Product Scope:** Katedra connects teacher preparation with a student learning journey. The teacher authoring/generation experience is implemented. The student experience is defined in the client landing and requirements document; class sharing and student-facing backend workflows are planned, not yet implemented.
+- **Teacher Experience:** The existing AI-driven workflow turns a structured syllabus into theory, evaluations, and presentation slides using Spring AI. Class publishing/sharing is future work.
+- **Student Experience:** The intended class journey is class → topic/material → activity → response → teacher feedback → next step. AI may clarify prompts or feedback and suggest practice; it must not submit work, change grades, or bypass teacher-defined attempt rules.
+- **Target Users:** Teachers preparing learning materials and, when class sharing is implemented, students studying and responding within shared classes.
+- **Backend Stack:** Spring Boot (Java 21) with Spring AI, modular monolith organized by domain capabilities.
 - **Database Stack:** PostgreSQL, Flyway migrations, UUIDs (`VARCHAR(36)`), soft deletes (`deleted_at`).
 - **AI Integration Architecture:** 
   - **Spring AI Integration:** ChatClient abstracts LLM provider communication
@@ -22,16 +24,16 @@ description: System context and backend technology stack
   - Spring Service calls ChatClient.prompt() → async LLM call → structured JSON response → Spring persists results to PostgreSQL
 
 ## 3. STANDARD OPERATING PROCEDURE (π_σ)
-1. **Goal Verification:** Ensure any new proposed feature directly serves the primary core goal: **Generating academic content via AI**. Reject features that deviate from this purpose.
+1. **Goal Verification:** Ensure features support either the teacher preparation/publishing workflow or the student learning/response journey. Do not reject student-facing work merely because it does not generate content with AI.
 2. **Stack Alignment:** Validate that solutions strictly use the approved technology stack. Automatically reject unauthorized technologies (e.g., MongoDB, Node.js).
 3. **Language Awareness:** Maintain code, variables, and database tables in Spanish (`snake_case` for DB, `camelCase` for Java) to match the established domain language, while keeping system prompts/skills in English.
 
 ## 4. COMPACT RECIPE (FEW-SHOT)
 Input: "What is the core feature of this app and how does it work?"
 Output Expected:
-> **Core Feature:** Katedra is an AI content generator for teachers. It automatically creates theory, exercises, and evaluations from syllabuses using OpenAI's GPT-4/4o models.
+> **Core Product:** Katedra connects teacher preparation with a planned student class journey. The teacher generator is implemented; class sharing and student-facing backend workflows remain planned.
 > **Architecture:** 
-> - **Spring Boot 3.x** handles users, authentication, syllabi CRUD, AI orchestration, and persistence.
+> - **Spring Boot** handles users, authentication, teacher syllabus/material workflows, AI orchestration, and persistence. Student workflows belong to the same modular monolith and require class-scoped authorization.
 > - **Spring AI ChatClient** abstracts OpenAI API calls with async/reactive patterns (no thread blocking).
 > - **Data Storage:** PostgreSQL (managed by Spring via Flyway). All entities use UUIDs and soft deletes.
 > - **Data Flow:** Service → ChatClient.prompt() → OpenAI (async) → structured JSON → persisted to PostgreSQL.

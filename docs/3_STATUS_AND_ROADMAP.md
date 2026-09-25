@@ -75,6 +75,12 @@ claridad qué funciona hoy y qué se ha dejado deliberadamente para después. Re
 
 Honesto y deliberadamente corto — esto son deseos, no compromisos.
 
+- **Experiencia de alumnos.** La landing `/alumnos` y el documento de requerimientos ya existen
+  en `katedra-client`; el recorrido de clase, entregas, retroalimentación y refuerzo aún no está
+  conectado al backend. Antes de implementarlo hay que definir invitaciones/inscripciones,
+  permisos por clase, persistencia de respuestas, intentos, publicación de resultados y límites de
+  la ayuda con IA.
+
 - **Modo live de Stripe.** El sistema de facturación está completo pero corre en modo de prueba
   de Stripe. Pasar a modo live es una tarea de configuración y verificación de cuenta, no de
   código.

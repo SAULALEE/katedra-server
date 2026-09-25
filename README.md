@@ -3,10 +3,11 @@
 [![CI](https://github.com/SAULALEE/katedra-server/actions/workflows/ci.yml/badge.svg)](https://github.com/SAULALEE/katedra-server/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Backend de **Katedra**, un generador de contenido académico impulsado por IA para
-profesores. Se le da un temario —escrito a mano, subido en archivo o desde una URL— y genera
-la estructura, la teoría, un examen y diapositivas, usando llamadas reales a OpenAI a través
-de Spring AI. Spring Boot 4, Java 21, PostgreSQL, facturación con Stripe.
+Backend de **Katedra**, que hoy permite a profesores preparar materiales y contempla una futura
+experiencia de aprendizaje para alumnos. El flujo de profesores genera estructura,
+teoría, exámenes y diapositivas desde un temario mediante Spring AI y OpenAI. La landing y los
+requerimientos de alumnos ya existen en `katedra-client`; sus clases, entregas y devoluciones aún
+no tienen implementación operativa en este backend. Spring Boot 4, Java 21, PostgreSQL y Stripe.
 
 Versión en inglés: [README.en.md](README.en.md) · Frontend: [katedra-client](https://github.com/SAULALEE/katedra-client)
 
@@ -46,8 +47,10 @@ flowchart LR
     Stripe --> StripeAPI[("Stripe API")]
 ```
 
-Un monolito modular por capas: los controladores solo ven DTOs, las entidades nunca salen de
-la capa de servicio, todas las llamadas a IA y Stripe son asíncronas. Detalles en
+Un monolito modular por capas: el dominio de profesores está implementado; el dominio de alumnos
+se incorporará en el mismo monolito con límites de acceso por clase. Los controladores solo ven
+DTOs, las entidades nunca salen de la capa de servicio, y las llamadas a IA y Stripe son
+asíncronas. Detalles en
 [docs/2_ARCHITECTURE_AND_TECH_STACK.md](docs/2_ARCHITECTURE_AND_TECH_STACK.md).
 
 ---
