@@ -4,15 +4,16 @@
 
 ## 1. Qué es
 
-Katedra es un generador de contenido académico impulsado por IA, construido para profesores. Un
-profesor describe un temario una sola vez —a mano, subiendo un documento, o desde una URL— y
-Katedra genera el material didáctico correspondiente: la estructura del temario, la teoría, un
-examen de opción múltiple y diapositivas de presentación. Todo lo generado queda organizado bajo
-el temario del que proviene, y puede exportarse a los formatos que los profesores realmente
-entregan.
+Katedra conecta la preparación de materiales por profesores con una futura experiencia de
+aprendizaje para alumnos. El flujo de autoría de profesores ya está implementado: describe un
+temario —a mano, subiendo un documento o desde una URL— y Katedra genera la estructura, teoría,
+examen y diapositivas. La experiencia de alumnos ya tiene una landing y un documento de
+requerimientos en `katedra-client`; compartir clases, entregas y devoluciones aún no está
+implementado en el backend.
 
-El usuario objetivo es un profesor en activo, y el objetivo es eliminar la mayor parte del tiempo
-de preparación manual, no reemplazar el criterio del profesor.
+El producto busca servir a profesores y alumnos. Para profesores reduce la preparación manual sin
+reemplazar su criterio. Para alumnos propone mantener tema, material, actividad, respuesta,
+retroalimentación y siguiente paso conectados dentro de cada clase.
 
 ## 2. Qué genera
 

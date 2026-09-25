@@ -43,7 +43,20 @@ Límites aplicados:
 Los errores se manejan de forma centralizada mediante un manejador global de excepciones
 `@RestControllerAdvice`, así que los controladores no contienen código de mapeo de errores.
 
-### 2.2 Superficie de peticiones
+### 2.2 Límites de producto
+
+- El dominio `teacher` contiene el flujo operativo de asignaturas, temarios y materiales generados.
+- Katedra Alumnos ya está definido en la landing y en el documento de requerimientos del cliente.
+  La experiencia backend de alumnos aún es futura; no existen todavía clases compartidas,
+  inscripciones, entregas ni devoluciones operativas.
+- El trabajo futuro de alumnos pertenece al paquete `student` dentro del mismo monolito. El acceso
+  debe validarse por pertenencia a la clase y por la relación entre clase, actividad, entrega y
+  devolución. Un alumno nunca debe leer entregas o resultados privados de otro.
+- El recorrido esperado es `clase → tema/material → actividad → respuesta/intento →
+  retroalimentación del profesor → siguiente paso`. La IA puede aclarar consignas o devoluciones y
+  sugerir práctica; no entrega respuestas ni cambia calificaciones o reglas de intentos.
+
+### 2.3 Superficie de peticiones
 
 Ocho controladores: autenticación, temarios (`temarios`), asignaturas (`asignaturas`), generación
 de contenido, exportaciones, suscripciones, usuarios, y el webhook de Stripe. Todas las rutas
