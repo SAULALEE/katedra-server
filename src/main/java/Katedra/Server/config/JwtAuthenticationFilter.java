@@ -3,6 +3,8 @@ package Katedra.Server.config;
 import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.UsuarioRepository;
 import Katedra.Server.service.JwtService;
+import Katedra.Server.model.RolUsuario;
+import Katedra.Server.student.service.StudentSessionRevocationService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,11 +32,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UsuarioRepository usuarioRepository;
+    private final StudentSessionRevocationService studentSessionRevocationService;
     private final SecurityContextRepository securityContextRepository = new RequestAttributeSecurityContextRepository();
 
-    public JwtAuthenticationFilter(JwtService jwtService, UsuarioRepository usuarioRepository) {
+    public JwtAuthenticationFilter(
+            JwtService jwtService,
+            UsuarioRepository usuarioRepository,
+            StudentSessionRevocationService studentSessionRevocationService
+    ) {
         this.jwtService = jwtService;
         this.usuarioRepository = usuarioRepository;
+        this.studentSessionRevocationService = studentSessionRevocationService;
     }
 
     @Override
@@ -67,7 +75,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // userDetailsService (which rejects social-login accounts with no local
             // password) has no business in this path: it would 500 every request
             // from a Google/Microsoft-authenticated user.
-            if (usuario.isPresent() && jwtService.isTokenValid(jwt, userEmail)) {
+            if (usuario.isPresent()
+                    && jwtService.isTokenValid(jwt, userEmail)
+                    && (usuario.get().getRol() != RolUsuario.ROLE_ALUMNO
+                    || !studentSessionRevocationService.isRevoked(jwt))) {
                 UserDetails userDetails = toUserDetails(usuario.get());
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         userDetails,

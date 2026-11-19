@@ -3,11 +3,27 @@ package Katedra.Server.controller;
 import Katedra.Server.dto.AuthLoginRequestDTO;
 import Katedra.Server.dto.AuthRegisterRequestDTO;
 import Katedra.Server.dto.AuthResponseDTO;
+import Katedra.Server.dto.PasswordRecoveryAcceptedResponseDTO;
+import Katedra.Server.dto.PasswordRecoveryRequestDTO;
+import Katedra.Server.dto.PasswordResetRequestDTO;
 import Katedra.Server.service.AuthService;
+import Katedra.Server.student.dto.GeneratedPasswordRecoveryTokenDTO;
+import Katedra.Server.student.delivery.PasswordRecoveryLinkDelivery;
+import Katedra.Server.student.service.StudentSessionRevocationService;
+import Katedra.Server.student.service.PasswordRecoveryService;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.net.URI;
+import java.util.Set;
 
 
 /**
@@ -19,9 +35,27 @@ import jakarta.validation.Valid;
 public class AuthController {
 
     private final AuthService authService;
+    private final PasswordRecoveryService passwordRecoveryService;
+    private final PasswordRecoveryLinkDelivery passwordRecoveryLinkDelivery;
+    private final StudentSessionRevocationService studentSessionRevocationService;
+    private final String passwordRecoveryPageUrl;
+    private final Validator validator;
 
-    public AuthController(AuthService authService) {
+    public AuthController(
+            AuthService authService,
+            PasswordRecoveryService passwordRecoveryService,
+            PasswordRecoveryLinkDelivery passwordRecoveryLinkDelivery,
+            StudentSessionRevocationService studentSessionRevocationService,
+            @Value("${app.frontend.password-recovery-url:http://localhost:5173/reset-password}")
+            String passwordRecoveryPageUrl,
+            Validator validator
+    ) {
         this.authService = authService;
+        this.passwordRecoveryService = passwordRecoveryService;
+        this.passwordRecoveryLinkDelivery = passwordRecoveryLinkDelivery;
+        this.studentSessionRevocationService = studentSessionRevocationService;
+        this.passwordRecoveryPageUrl = passwordRecoveryPageUrl;
+        this.validator = validator;
     }
 
     /**
@@ -51,6 +85,45 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(request));
     }
 
+    @PostMapping("/password/forgot")
+    public ResponseEntity<PasswordRecoveryAcceptedResponseDTO> forgotPassword(
+            @Valid @RequestBody PasswordRecoveryRequestDTO request
+    ) {
+        try {
+            GeneratedPasswordRecoveryTokenDTO generated = passwordRecoveryService.generateTokenForStudent(request.email());
+            URI recoveryLink = UriComponentsBuilder.fromUriString(passwordRecoveryPageUrl)
+                    .queryParam("token", generated.token())
+                    .build()
+                    .encode()
+                    .toUri();
+            try {
+                passwordRecoveryLinkDelivery.deliver(request.email(), recoveryLink, generated.expiresAt());
+            } catch (RuntimeException ignored) {
+                // Do not log delivery exceptions: they may contain the recovery link.
+            }
+        } catch (ResponseStatusException exception) {
+            HttpStatus status = HttpStatus.valueOf(exception.getStatusCode().value());
+            if (status != HttpStatus.NOT_FOUND && status != HttpStatus.FORBIDDEN) {
+                throw exception;
+            }
+        }
+
+        return ResponseEntity.accepted().body(new PasswordRecoveryAcceptedResponseDTO(
+                "Si existe una cuenta de alumno asociada a este correo, recibirás instrucciones para recuperar tu contraseña."
+        ));
+    }
+
+    @PostMapping("/password/reset")
+    public ResponseEntity<Void> resetPassword(@RequestBody PasswordResetRequestDTO request) {
+        Set<ConstraintViolation<PasswordResetRequestDTO>> violations = validator.validate(request);
+        if (!violations.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        passwordRecoveryService.resetPassword(request.token(), request.newPassword());
+        return ResponseEntity.noContent().build();
+    }
+
     /**
      * Logs out the current user. JWT auth is stateless, so there is no server-side
      * session to invalidate; the client discards its token. This endpoint exists so
@@ -60,7 +133,12 @@ public class AuthController {
      * @return HTTP 204 No Content
      */
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout() {
+    public ResponseEntity<Void> logout(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader
+    ) {
+        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+            studentSessionRevocationService.revoke(authorizationHeader.substring(7));
+        }
         return ResponseEntity.noContent().build();
     }
 

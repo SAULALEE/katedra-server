@@ -1,6 +1,7 @@
 package Katedra.Server.service;
 
 import Katedra.Server.model.Usuario;
+import Katedra.Server.model.RolUsuario;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -11,9 +12,14 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.security.SecureRandom;
+import java.util.Base64;
 
 @Service
 public class JwtService {
+
+    private static final int SESSION_ID_BYTES = 32;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     @Value("${jwt.secret}")
     private String secretKey;
@@ -27,6 +33,11 @@ public class JwtService {
 
     public String generateToken(Usuario usuario) {
         Map<String, Object> extraClaims = new HashMap<>();
+        if (usuario.getRol() == RolUsuario.ROLE_ALUMNO) {
+            byte[] sessionId = new byte[SESSION_ID_BYTES];
+            secureRandom.nextBytes(sessionId);
+            extraClaims.put("jti", Base64.getUrlEncoder().withoutPadding().encodeToString(sessionId));
+        }
         extraClaims.put("rol", usuario.getRol());
         extraClaims.put("nombre", usuario.getNombre());
         // Display only. Lets the OAuth callback, which builds the session purely from the
@@ -46,6 +57,19 @@ public class JwtService {
     public boolean isTokenValid(String token, String userEmail) {
         final String username = extractUsername(token);
         return (username.equals(userEmail)) && !isTokenExpired(token);
+    }
+
+    public String extractTokenId(String token) {
+        return extractAllClaims(token).getId();
+    }
+
+    public String extractRole(String token) {
+        Object role = extractAllClaims(token).get("rol");
+        return role instanceof String roleName ? roleName : null;
+    }
+
+    public Date extractExpirationDate(String token) {
+        return extractExpiration(token);
     }
 
     private String buildToken(Map<String, Object> extraClaims, Usuario usuario, long expiration) {
