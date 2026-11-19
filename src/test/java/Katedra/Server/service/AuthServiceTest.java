@@ -72,6 +72,30 @@ class AuthServiceTest {
     }
 
     @Test
+    void shouldNotPromotePublicRegistrationBasedOnKatedraEmailDomain() {
+        AuthRegisterRequestDTO request = new AuthRegisterRequestDTO("admin@katedra.com", "fuego123", "Admin");
+        given(usuarioRepository.findByEmail(request.email())).willReturn(Optional.empty());
+        given(passwordEncoder.encode(request.password())).willReturn("encoded_fuego123");
+        given(jwtService.generateToken(any(Usuario.class))).willReturn("mocked_jwt_token");
+
+        AuthResponseDTO response = authService.register(request);
+
+        assertThat(response.usuario().rol()).isEqualTo(RolUsuario.ROLE_PROFESOR);
+    }
+
+    @Test
+    void shouldRegisterStudentExclusivelyAsAlumnoEvenWithKatedraEmailDomain() {
+        AuthRegisterRequestDTO request = new AuthRegisterRequestDTO("student@katedra.com", "fuego123", "Student");
+        given(usuarioRepository.findByEmail(request.email())).willReturn(Optional.empty());
+        given(passwordEncoder.encode(request.password())).willReturn("encoded_fuego123");
+        given(jwtService.generateToken(any(Usuario.class))).willReturn("mocked_jwt_token");
+
+        AuthResponseDTO response = authService.registerStudent(request);
+
+        assertThat(response.usuario().rol()).isEqualTo(RolUsuario.ROLE_ALUMNO);
+    }
+
+    @Test
     void shouldThrowExceptionWhenRegisteringExistingEmail() {
         // Arrange
         AuthRegisterRequestDTO request = new AuthRegisterRequestDTO("test@cueva.com", "fuego123", "Grog");
@@ -103,6 +127,19 @@ class AuthServiceTest {
         assertThat(response.usuario().email()).isEqualTo("test@cueva.com");
         
         verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
+    }
+
+    @Test
+    void shouldReturnAlumnoRoleWhenStudentLogsInThroughSharedEndpoint() {
+        AuthLoginRequestDTO request = new AuthLoginRequestDTO("student@example.com", "fuego123");
+        Usuario student = new Usuario("student@example.com", "encoded_fuego123", "Student", RolUsuario.ROLE_ALUMNO);
+        given(usuarioRepository.findByEmail(request.email())).willReturn(Optional.of(student));
+        given(jwtService.generateToken(student)).willReturn("student_jwt");
+
+        AuthResponseDTO response = authService.login(request);
+
+        assertThat(response.usuario().rol()).isEqualTo(RolUsuario.ROLE_ALUMNO);
+        assertThat(response.token()).isEqualTo("student_jwt");
     }
 
     @Test
@@ -138,6 +175,24 @@ class AuthServiceTest {
         assertThat(captor.getValue().getProviderUserId()).isEqualTo("google-123");
         assertThat(captor.getValue().getRol()).isEqualTo(RolUsuario.ROLE_PROFESOR);
         assertThat(response.token()).isEqualTo("google_jwt");
+    }
+
+    @Test
+    void shouldNotPromoteNewMicrosoftAccountBasedOnKatedraEmailDomain() {
+        given(usuarioRepository.findByAuthProviderAndProviderUserId(AuthProvider.MICROSOFT, "microsoft-123"))
+                .willReturn(Optional.empty());
+        given(usuarioRepository.findByEmail("new-admin@katedra.com")).willReturn(Optional.empty());
+        given(usuarioRepository.save(any(Usuario.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(jwtService.generateToken(any(Usuario.class))).willReturn("microsoft_jwt");
+
+        AuthResponseDTO response = authService.loginOrRegisterSocial(
+                AuthProvider.MICROSOFT,
+                "microsoft-123",
+                "new-admin@katedra.com",
+                "New account"
+        );
+
+        assertThat(response.usuario().rol()).isEqualTo(RolUsuario.ROLE_PROFESOR);
     }
 
     @Test

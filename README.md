@@ -24,10 +24,10 @@ Versión en inglés: [README.en.md](README.en.md) · Frontend: [katedra-client](
 
 ### Cuentas de demo
 
-Cualquier correo que termine en `@katedra.com` se autoregistra como administrador
-(`AuthService.resolveRoleByEmail`); cualquier otro correo se registra como cuenta de profesor
-normal en el plan Gratis. Regístrate en `/auth/register` para probar la app de inmediato —
-una cuenta de demo pública con un login Free y otro Pro está planeada pero aún no publicada.
+El registro público `/auth/register` crea cuentas de profesor en el plan Gratis; para alumnos,
+usa `/auth/students/register`. Ningún correo obtiene privilegios de administrador por su dominio.
+Los administradores existentes pueden crear otras cuentas administrativas desde la gestión de
+usuarios. Las credenciales de demo aún no están publicadas.
 
 ---
 
@@ -146,7 +146,7 @@ Dos fuentes, siempre sincronizadas entre sí porque ambas provienen del mismo c�
   Generado en vivo desde los controladores (springdoc), por lo que no puede desincronizarse
   del código como sí le pasaba a una especificación escrita a mano. Spec cruda en
   `/api/v1/v3/api-docs`.
-- **[Colección de Bruno](api/bruno/)** — 37 peticiones, una por endpoint, con un entorno
+- **[Colección de Bruno](api/bruno/)** — 39 peticiones, una por endpoint, con un entorno
   `Local` y otro `Production` y un orden de ejecución sugerido. Gratis, offline, en texto
   plano — abre `api/bruno/` como colección en [Bruno](https://www.usebruno.com/).
 
@@ -157,6 +157,7 @@ Dos fuentes, siempre sincronizadas entre sí porque ambas provienen del mismo c�
 ```
 src/main/java/Katedra/Server/
   controller/   endpoints REST — solo DTOs de entrada y salida
+  student/      perfil y endpoints exclusivos para alumnos
   service/      lógica de negocio, orquestación de IA, orquestación de Stripe
   repository/   interfaces de Spring Data JPA
   model/        entidades JPA y enums de dominio

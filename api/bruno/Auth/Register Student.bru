@@ -1,0 +1,27 @@
+meta {
+  name: Register Student
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/auth/students/register
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "student@example.com",
+    "password": "ChangeMe123!",
+    "nombre": "Demo Student"
+  }
+}
+
+docs {
+  Creates a ROLE_ALUMNO account. Use Auth/Login afterward to store its JWT in {{jwt}}.
+}

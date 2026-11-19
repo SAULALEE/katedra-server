@@ -46,8 +46,8 @@ Los errores se manejan de forma centralizada mediante un manejador global de exc
 ### 2.2 Límites de producto
 
 - El dominio `teacher` contiene el flujo operativo de asignaturas, temarios y materiales generados.
-- Katedra Alumnos ya está definido en la landing y en el documento de requerimientos del cliente.
-  La experiencia backend de alumnos aún es futura; no existen todavía clases compartidas,
+- La autenticación de alumnos usa `ROLE_ALUMNO` y ofrece un perfil propio protegido en
+  `/students/me`. La experiencia académica backend aún es futura: no existen clases compartidas,
   inscripciones, entregas ni devoluciones operativas.
 - El trabajo futuro de alumnos pertenece al paquete `student` dentro del mismo monolito. El acceso
   debe validarse por pertenencia a la clase y por la relación entre clase, actividad, entrega y

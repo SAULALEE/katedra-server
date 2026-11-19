@@ -28,8 +28,7 @@ script:post-response {
 }
 
 docs {
-  Any email ending in @katedra.com is auto-promoted to ROLE_ADMIN by
-  AuthService#resolveRoleByEmail. Every other email registers as ROLE_PROFESOR on
-  PlanUsuario.FREE. There is no way to set `plan` through this endpoint or any other —
-  it is only ever written by SuscripcionService from a live Stripe sync.
+  Public self-registration always creates ROLE_PROFESOR. Email domains never grant admin
+  privileges. Student registration uses Auth/Register Student. There is no way to set `plan`
+  through this endpoint or any other — it is only written by SuscripcionService from Stripe.
 }

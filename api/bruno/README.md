@@ -8,7 +8,7 @@ This collection is the *runnable* way to explore the API — request bodies, run
 the caveats each request has. For the *authoritative, always-current* contract, the running
 server also generates its own OpenAPI spec straight from the controllers (springdoc), so it
 can never drift the way a hand-written spec can: open `/api/v1/swagger-ui/index.html`, or
-fetch the raw JSON from `/api/v1/v3/api-docs`. Both sources describe the same 37 endpoints;
+fetch the raw JSON from `/api/v1/v3/api-docs`. Both sources describe the same 39 endpoints;
 use whichever fits the moment.
 
 ## Environments
@@ -31,17 +31,19 @@ token into the collection's `{{jwt}}` variable, and every other request already 
 `Authorization: Bearer {{jwt}}`. Re-run Login whenever the token expires (1 hour by
 default).
 
-To get an admin token, log in with an account whose email ends in `@katedra.com` — see
-`Auth/Register.bru` for why that specific domain matters.
+Admin-only requests require a pre-provisioned `ROLE_ADMIN` account. Public registration never
+grants administrator privileges based on an email domain. A signed-in administrator can create
+additional admin accounts with `Usuarios/Create Admin`.
 
 ## Suggested run order for a cold environment
 
-1. `Auth/Register` (any email) → `Auth/Login`
-2. `Asignaturas/Create` → sets `{{asignaturaId}}`
-3. `Temarios/Create` → sets `{{temarioId}}` (this call generates the outline for real, so
+1. `Auth/Register` (teacher) or `Auth/Register Student` (student) → `Auth/Login`
+2. For students, call `Students/Get Me` to read the authenticated profile.
+3. For teachers, `Asignaturas/Create` → sets `{{asignaturaId}}`
+4. `Temarios/Create` → sets `{{temarioId}}` (this call generates the outline for real, so
    it takes a few seconds and spends an OpenAI call)
-4. `Temarios/Generate Material` with `"piezas": ["teoria"]`
-5. `Exportaciones/Export` with `pieza=teoria&formato=pdf`
+5. `Temarios/Generate Material` with `"piezas": ["teoria"]`
+6. `Exportaciones/Export` with `pieza=teoria&formato=pdf`
 
 ## What can't run from Bruno
 

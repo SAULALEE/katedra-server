@@ -23,10 +23,10 @@ Spanish version: [README.md](README.md) · Frontend: [katedra-client](https://gi
 
 ### Demo accounts
 
-Any email ending in `@katedra.com` self-registers as an admin (`AuthService.resolveRoleByEmail`);
-any other email registers as a regular teacher account on the Free plan. Register your own
-account at `/auth/register` to try the app immediately — a public seeded demo account with a
-Free and a Pro login is planned but not live yet.
+Public registration at `/auth/register` creates teacher accounts on the Free plan; student
+accounts use `/auth/students/register`. Email domains never grant administrator privileges.
+Existing administrators can create other administrator accounts through user management.
+Demo credentials are not published yet.
 
 ---
 
@@ -131,7 +131,7 @@ Two sources, always in sync with each other because both come from the same runn
 - **Swagger UI** — start the app, open `http://localhost:8080/api/v1/swagger-ui/index.html`.
   Generated live from the controllers (springdoc), so it cannot drift from the code the way a
   hand-written spec can. Raw spec at `/api/v1/v3/api-docs`.
-- **[Bruno collection](api/bruno/)** — 37 requests, one per endpoint, with a `Local` and a
+- **[Bruno collection](api/bruno/)** — 39 requests, one per endpoint, with a `Local` and a
   `Production` environment and a suggested run order. Free, offline, plain-text — open
   `api/bruno/` as a collection in [Bruno](https://www.usebruno.com/).
 
@@ -142,6 +142,7 @@ Two sources, always in sync with each other because both come from the same runn
 ```
 src/main/java/Katedra/Server/
   controller/   REST endpoints — DTOs in, DTOs out
+  student/      student profile and role-specific endpoints
   service/      business logic, AI orchestration, Stripe orchestration
   repository/   Spring Data JPA interfaces
   model/        JPA entities and domain enums

@@ -36,7 +36,9 @@ public class AuthService {
     }
 
     public AuthResponseDTO register(AuthRegisterRequestDTO request) {
-        return registerWithRole(request, resolveRoleByEmail(request.email()));
+        // Public self-registration must never grant administrative privileges based
+        // only on a caller-controlled email address.
+        return registerWithRole(request, RolUsuario.ROLE_PROFESOR);
     }
 
     public AuthResponseDTO registerStudent(AuthRegisterRequestDTO request) {
@@ -162,16 +164,10 @@ public class AuthService {
         usuario.setNombre(nombre != null && !nombre.isBlank() ? nombre : email);
         usuario.setAuthProvider(authProvider);
         usuario.setProviderUserId(providerUserId);
-        usuario.setRol(authProvider == AuthProvider.GOOGLE
-                ? RolUsuario.ROLE_PROFESOR
-                : resolveRoleByEmail(email));
+        // Social sign-up is public too; a provider-verified email domain alone does not
+        // authorize an administrative role.
+        usuario.setRol(RolUsuario.ROLE_PROFESOR);
         return usuarioRepository.save(usuario);
-    }
-
-    private RolUsuario resolveRoleByEmail(String email) {
-        return email != null && email.toLowerCase().endsWith("@katedra.com")
-                ? RolUsuario.ROLE_ADMIN
-                : RolUsuario.ROLE_PROFESOR;
     }
 
     private UsuarioDTO mapToDTO(Usuario usuario) {
