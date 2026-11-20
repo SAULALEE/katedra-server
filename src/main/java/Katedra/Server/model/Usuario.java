@@ -61,6 +61,9 @@ public class Usuario {
     @Column(name = "must_change_password", nullable = false)
     private boolean mustChangePassword = false;
 
+    @Column(name = "password_changed_at")
+    private LocalDateTime passwordChangedAt;
+
     public Usuario() {}
 
     public Usuario(String email, String password, String nombre, RolUsuario rol) {
@@ -95,4 +98,6 @@ public class Usuario {
     public void setPlan(PlanUsuario plan) { this.plan = plan; }
     public boolean isMustChangePassword() { return mustChangePassword; }
     public void setMustChangePassword(boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
+    public LocalDateTime getPasswordChangedAt() { return passwordChangedAt; }
+    public void setPasswordChangedAt(LocalDateTime passwordChangedAt) { this.passwordChangedAt = passwordChangedAt; }
 }

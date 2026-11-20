@@ -1,11 +1,12 @@
-package Katedra.Server.student.service;
+package Katedra.Server.service;
 
+import Katedra.Server.model.AuthProvider;
 import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.UsuarioRepository;
-import Katedra.Server.student.model.PasswordRecoveryToken;
-import Katedra.Server.student.repository.PasswordRecoveryTokenRepository;
-import Katedra.Server.student.dto.GeneratedPasswordRecoveryTokenDTO;
+import Katedra.Server.model.PasswordRecoveryToken;
+import Katedra.Server.repository.PasswordRecoveryTokenRepository;
+import Katedra.Server.dto.GeneratedPasswordRecoveryTokenDTO;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +29,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -59,7 +61,7 @@ class PasswordRecoveryServiceTest {
                 .willAnswer(invocation -> invocation.getArgument(0));
         LocalDateTime beforeGeneration = LocalDateTime.now(ZoneOffset.UTC);
 
-        GeneratedPasswordRecoveryTokenDTO generated = service.generateTokenForStudent(student.getEmail());
+        GeneratedPasswordRecoveryTokenDTO generated = service.generateToken(student.getEmail()).orElseThrow();
 
         LocalDateTime afterGeneration = LocalDateTime.now(ZoneOffset.UTC);
         ArgumentCaptor<PasswordRecoveryToken> tokenCaptor = ArgumentCaptor.forClass(PasswordRecoveryToken.class);
@@ -67,6 +69,7 @@ class PasswordRecoveryServiceTest {
         PasswordRecoveryToken persisted = tokenCaptor.getValue();
 
         assertThat(generated.token()).matches("^[A-Za-z0-9_-]{43}$");
+        assertThat(generated.rol()).isEqualTo(RolUsuario.ROLE_ALUMNO);
         assertThat(persisted.getTokenHash()).isEqualTo(sha256(generated.token()));
         assertThat(persisted.getTokenHash()).isNotEqualTo(generated.token());
         assertThat(persisted.getUsuario()).isSameAs(student);
@@ -77,25 +80,62 @@ class PasswordRecoveryServiceTest {
     }
 
     @Test
-    void shouldRejectRecoveryTokenGenerationForNonStudentUsers() {
+    void shouldGenerateTokenForTeacher() {
         Usuario teacher = new Usuario("teacher@example.com", "password-hash", "Teacher", RolUsuario.ROLE_PROFESOR);
         given(usuarioRepository.findByEmail(teacher.getEmail())).willReturn(Optional.of(teacher));
+        given(tokenRepository.save(any(PasswordRecoveryToken.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-                () -> service.generateTokenForStudent(teacher.getEmail()));
+        Optional<GeneratedPasswordRecoveryTokenDTO> generated = service.generateToken(teacher.getEmail());
 
-        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(generated).isPresent();
+        assertThat(generated.get().rol()).isEqualTo(RolUsuario.ROLE_PROFESOR);
+    }
+
+    @Test
+    void shouldNotGenerateTokenForAdmin() {
+        Usuario admin = new Usuario("admin@example.com", "password-hash", "Admin", RolUsuario.ROLE_ADMIN);
+        given(usuarioRepository.findByEmail(admin.getEmail())).willReturn(Optional.of(admin));
+
+        assertThat(service.generateToken(admin.getEmail())).isEmpty();
         verify(tokenRepository, never()).save(any(PasswordRecoveryToken.class));
     }
 
     @Test
-    void shouldRejectRecoveryTokenGenerationWhenStudentDoesNotExist() {
+    void shouldNotGenerateTokenForSocialLoginAccount() {
+        Usuario student = new Usuario("social@example.com", null, "Social", RolUsuario.ROLE_ALUMNO);
+        student.setAuthProvider(AuthProvider.GOOGLE);
+        given(usuarioRepository.findByEmail(student.getEmail())).willReturn(Optional.of(student));
+
+        assertThat(service.generateToken(student.getEmail())).isEmpty();
+        verify(tokenRepository, never()).save(any(PasswordRecoveryToken.class));
+    }
+
+    @Test
+    void shouldNotGenerateTokenForDeletedAccount() {
+        Usuario student = new Usuario("deleted@example.com", "password-hash", "Deleted", RolUsuario.ROLE_ALUMNO);
+        student.setDeletedAt(LocalDateTime.now());
+        given(usuarioRepository.findByEmail(student.getEmail())).willReturn(Optional.of(student));
+
+        assertThat(service.generateToken(student.getEmail())).isEmpty();
+        verify(tokenRepository, never()).save(any(PasswordRecoveryToken.class));
+    }
+
+    @Test
+    void shouldNotGenerateTokenWhenEmailDoesNotExist() {
         given(usuarioRepository.findByEmail("missing@example.com")).willReturn(Optional.empty());
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-                () -> service.generateTokenForStudent("missing@example.com"));
+        assertThat(service.generateToken("missing@example.com")).isEmpty();
+        verify(tokenRepository, never()).save(any(PasswordRecoveryToken.class));
+    }
 
-        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    @Test
+    void shouldStopIssuingTokensAfterThreeRequestsInFifteenMinutes() {
+        Usuario student = new Usuario("student@example.com", "password-hash", "Student", RolUsuario.ROLE_ALUMNO);
+        given(usuarioRepository.findByEmail(student.getEmail())).willReturn(Optional.of(student));
+        given(tokenRepository.countByUsuarioAndCreatedAtAfter(eq(student), any(LocalDateTime.class))).willReturn(3L);
+
+        assertThat(service.generateToken(student.getEmail())).isEmpty();
         verify(tokenRepository, never()).save(any(PasswordRecoveryToken.class));
     }
 
@@ -121,6 +161,7 @@ class PasswordRecoveryServiceTest {
         assertThat(student.getPassword()).startsWith("$2");
         assertThat(bcryptEncoder.matches("newPassword123", student.getPassword())).isTrue();
         assertThat(token.getConsumedAt()).isNotNull();
+        assertThat(student.getPasswordChangedAt()).isEqualTo(token.getConsumedAt());
         verify(usuarioRepository).save(student);
         verify(tokenRepository).save(token);
     }
@@ -146,8 +187,8 @@ class PasswordRecoveryServiceTest {
     }
 
     @Test
-    void shouldRejectTokenForNonStudentWithoutChangingPassword() throws Exception {
-        Usuario teacher = new Usuario("teacher@example.com", "password-hash", "Teacher", RolUsuario.ROLE_PROFESOR);
+    void shouldRejectTokenForAdminWithoutChangingPassword() throws Exception {
+        Usuario teacher = new Usuario("admin@example.com", "password-hash", "Admin", RolUsuario.ROLE_ADMIN);
         PasswordRecoveryToken token = new PasswordRecoveryToken(
                 teacher, sha256("teacher-token"), LocalDateTime.now(ZoneOffset.UTC).plusMinutes(15));
         given(tokenRepository.findByTokenHashForUpdate(sha256("teacher-token")))

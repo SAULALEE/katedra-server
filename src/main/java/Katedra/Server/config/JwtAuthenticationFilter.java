@@ -77,6 +77,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // from a Google/Microsoft-authenticated user.
             if (usuario.isPresent()
                     && jwtService.isTokenValid(jwt, userEmail)
+                    && !issuedBeforePasswordReset(jwt, usuario.get())
                     && (usuario.get().getRol() != RolUsuario.ROLE_ALUMNO
                     || !studentSessionRevocationService.isRevoked(jwt))) {
                 UserDetails userDetails = toUserDetails(usuario.get());
@@ -99,6 +100,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         }
         filterChain.doFilter(request, response);
+    }
+
+    private boolean issuedBeforePasswordReset(String jwt, Usuario usuario) {
+        return usuario.getPasswordChangedAt() != null
+                && jwtService.isIssuedBefore(jwt, usuario.getPasswordChangedAt());
     }
 
     private UserDetails toUserDetails(Usuario usuario) {

@@ -1,4 +1,4 @@
-package Katedra.Server.student.delivery;
+package Katedra.Server.delivery;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.mail.SimpleMailMessage;

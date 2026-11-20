@@ -1,4 +1,4 @@
-package Katedra.Server.student.model;
+package Katedra.Server.model;
 
 import Katedra.Server.model.Usuario;
 import jakarta.persistence.Column;

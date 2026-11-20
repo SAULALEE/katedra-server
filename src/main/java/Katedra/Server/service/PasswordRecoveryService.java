@@ -1,11 +1,12 @@
-package Katedra.Server.student.service;
+package Katedra.Server.service;
 
+import Katedra.Server.model.AuthProvider;
 import Katedra.Server.model.RolUsuario;
 import Katedra.Server.model.Usuario;
 import Katedra.Server.repository.UsuarioRepository;
-import Katedra.Server.student.dto.GeneratedPasswordRecoveryTokenDTO;
-import Katedra.Server.student.model.PasswordRecoveryToken;
-import Katedra.Server.student.repository.PasswordRecoveryTokenRepository;
+import Katedra.Server.dto.GeneratedPasswordRecoveryTokenDTO;
+import Katedra.Server.model.PasswordRecoveryToken;
+import Katedra.Server.repository.PasswordRecoveryTokenRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,13 +21,19 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Base64;
+import java.util.EnumSet;
 import java.util.HexFormat;
+import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class PasswordRecoveryService {
 
     private static final int TOKEN_SIZE_BYTES = 32;
     private static final Duration TOKEN_TTL = Duration.ofMinutes(15);
+    private static final Duration RATE_LIMIT_WINDOW = Duration.ofMinutes(15);
+    private static final long MAX_REQUESTS_PER_WINDOW = 3;
+    private static final Set<RolUsuario> RECOVERABLE_ROLES = EnumSet.of(RolUsuario.ROLE_PROFESOR, RolUsuario.ROLE_ALUMNO);
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordRecoveryTokenRepository tokenRepository;
@@ -41,25 +48,44 @@ public class PasswordRecoveryService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    /**
+     * Issues a recovery token for an eligible account. Returns empty, without revealing why,
+     * when the email is unknown, the account is deleted, uses social login, is an admin,
+     * or has reached the request limit.
+     */
     @Transactional
-    public GeneratedPasswordRecoveryTokenDTO generateTokenForStudent(String email) {
-        Usuario student = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Alumno no encontrado"));
+    public Optional<GeneratedPasswordRecoveryTokenDTO> generateToken(String email) {
+        Optional<Usuario> found = usuarioRepository.findByEmail(email);
+        if (found.isEmpty() || !isEligible(found.get())) {
+            return Optional.empty();
+        }
+        Usuario usuario = found.get();
 
-        if (student.getRol() != RolUsuario.ROLE_ALUMNO) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Recuperación disponible solo para alumnos");
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        if (tokenRepository.countByUsuarioAndCreatedAtAfter(usuario, now.minus(RATE_LIMIT_WINDOW))
+                >= MAX_REQUESTS_PER_WINDOW) {
+            return Optional.empty();
         }
 
         byte[] randomBytes = new byte[TOKEN_SIZE_BYTES];
         secureRandom.nextBytes(randomBytes);
         String rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
-        LocalDateTime expiresAt = LocalDateTime.now(ZoneOffset.UTC).plus(TOKEN_TTL);
+        LocalDateTime expiresAt = now.plus(TOKEN_TTL);
 
-        tokenRepository.save(new PasswordRecoveryToken(student, hashToken(rawToken), expiresAt));
-        return new GeneratedPasswordRecoveryTokenDTO(rawToken, expiresAt);
+        tokenRepository.save(new PasswordRecoveryToken(usuario, hashToken(rawToken), expiresAt));
+        return Optional.of(new GeneratedPasswordRecoveryTokenDTO(rawToken, expiresAt, usuario.getRol()));
     }
 
-    /** Resets a student's password and consumes the recovery token in one transaction. */
+    private boolean isEligible(Usuario usuario) {
+        return usuario.getDeletedAt() == null
+                && usuario.getAuthProvider() == AuthProvider.LOCAL
+                && RECOVERABLE_ROLES.contains(usuario.getRol());
+    }
+
+    /**
+     * Resets the password, consumes the recovery token and stamps passwordChangedAt so
+     * every JWT issued before the reset is rejected, all in one transaction.
+     */
     @Transactional
     public void resetPassword(String rawToken, String newPassword) {
         if (newPassword == null || newPassword.isBlank() || newPassword.length() < 8 || newPassword.length() > 100) {
@@ -79,13 +105,15 @@ public class PasswordRecoveryService {
 
         if (token.getConsumedAt() != null
                 || !token.getExpiresAt().isAfter(now)
-                || student.getRol() != RolUsuario.ROLE_ALUMNO) {
+                || !isEligible(student)) {
             throw invalidRecoveryToken();
         }
 
         String encodedPassword = passwordEncoder.encode(newPassword);
         student.setPassword(encodedPassword);
         student.setUpdatedAt(now);
+        student.setPasswordChangedAt(now);
+        student.setMustChangePassword(false);
         usuarioRepository.save(student);
 
         token.setConsumedAt(now);

@@ -1,4 +1,4 @@
-package Katedra.Server.student.delivery;
+package Katedra.Server.delivery;
 
 import java.net.URI;
 import java.time.LocalDateTime;
