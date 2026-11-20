@@ -1,0 +1,20 @@
+meta {
+  name: Get Me
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/students/me
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{jwt}}
+}
+
+docs {
+  Requires a ROLE_ALUMNO token from Auth/Login. Returns only the authenticated student's
+  id, email, name, and account creation date. Teachers and administrators receive 403.
+}

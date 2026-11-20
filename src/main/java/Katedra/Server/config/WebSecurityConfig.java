@@ -93,6 +93,8 @@ public class WebSecurityConfig {
                 // ROLE_PROFESOR: academic features only
                 .requestMatchers("/asignaturas/**", "/api/v1/asignaturas/**").hasRole("PROFESOR")
                 .requestMatchers("/temarios/**", "/api/v1/temarios/**").hasRole("PROFESOR")
+                // Student self-service endpoints are isolated from teacher and admin APIs.
+                .requestMatchers("/students/**", "/api/v1/students/**").hasRole("ALUMNO")
                 // Deny everything else
                 .anyRequest().denyAll()
             )

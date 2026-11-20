@@ -39,4 +39,29 @@ class JwtServiceTest {
 
         assertThat(claims.get("nombre", String.class)).isEqualTo("María González");
     }
+    @Test
+    void shouldGenerateUniqueSessionIdsOnlyForStudentTokensAndKeepExpiration() {
+        JwtService jwtService = new JwtService();
+        ReflectionTestUtils.setField(jwtService, "secretKey", SECRET);
+        ReflectionTestUtils.setField(jwtService, "jwtExpiration", 900_000L);
+        Usuario student = new Usuario("student@example.com", "hash", "Student", RolUsuario.ROLE_ALUMNO);
+
+        Claims firstClaims = parse(jwtService.generateToken(student));
+        Claims secondClaims = parse(jwtService.generateToken(student));
+
+        assertThat(firstClaims.getId()).isNotBlank().isNotEqualTo(secondClaims.getId());
+        assertThat(firstClaims.getExpiration().getTime() - firstClaims.getIssuedAt().getTime())
+                .isBetween(899_000L, 900_001L);
+
+        Usuario teacher = new Usuario("teacher@example.com", "hash", "Teacher", RolUsuario.ROLE_PROFESOR);
+        assertThat(parse(jwtService.generateToken(teacher)).getId()).isNull();
+    }
+
+    private Claims parse(String token) {
+        return Jwts.parser()
+                .verifyWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)))
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
 }
