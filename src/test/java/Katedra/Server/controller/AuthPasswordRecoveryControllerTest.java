@@ -1,11 +1,12 @@
 package Katedra.Server.controller;
 
+import Katedra.Server.model.RolUsuario;
 import Katedra.Server.service.AuthService;
 import Katedra.Server.service.JwtService;
 import Katedra.Server.repository.UsuarioRepository;
-import Katedra.Server.student.delivery.PasswordRecoveryLinkDelivery;
-import Katedra.Server.student.dto.GeneratedPasswordRecoveryTokenDTO;
-import Katedra.Server.student.service.PasswordRecoveryService;
+import Katedra.Server.delivery.PasswordRecoveryLinkDelivery;
+import Katedra.Server.dto.GeneratedPasswordRecoveryTokenDTO;
+import Katedra.Server.service.PasswordRecoveryService;
 import Katedra.Server.student.service.StudentSessionRevocationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuthPasswordRecoveryControllerTest {
 
     private static final String GENERIC_MESSAGE =
-            "Si existe una cuenta de alumno asociada a este correo, recibirás instrucciones para recuperar tu contraseña.";
+            "Si existe una cuenta asociada a este correo, recibirás instrucciones para recuperar tu contraseña.";
 
     @Autowired
     private MockMvc mockMvc;
@@ -69,8 +71,8 @@ class AuthPasswordRecoveryControllerTest {
         String email = "student@example.com";
         String token = "secret-recovery-token";
         LocalDateTime expiresAt = LocalDateTime.of(2026, 11, 18, 22, 0);
-        given(passwordRecoveryService.generateTokenForStudent(email))
-                .willReturn(new GeneratedPasswordRecoveryTokenDTO(token, expiresAt));
+        given(passwordRecoveryService.generateToken(email))
+                .willReturn(Optional.of(new GeneratedPasswordRecoveryTokenDTO(token, expiresAt, RolUsuario.ROLE_ALUMNO)));
 
         String response = mockMvc.perform(post("/auth/password/forgot")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -82,13 +84,31 @@ class AuthPasswordRecoveryControllerTest {
         assertThat(response).doesNotContain(token).doesNotContain(email);
         ArgumentCaptor<URI> linkCaptor = ArgumentCaptor.forClass(URI.class);
         verify(linkDelivery).deliver(eq(email), linkCaptor.capture(), eq(expiresAt));
-        assertThat(linkCaptor.getValue()).hasToString("http://localhost:5173/reset-password?token=" + token);
+        assertThat(linkCaptor.getValue())
+                .hasToString("http://localhost:5173/alumnos/restablecer-contrasena?token=" + token);
     }
 
     @Test
-    void shouldReturnSameAcceptedResponseWhenEmailHasNoStudentAccount() throws Exception {
-        given(passwordRecoveryService.generateTokenForStudent("missing@example.com"))
-                .willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Alumno no encontrado"));
+    void shouldLinkTeachersToTheTeacherResetPage() throws Exception {
+        String email = "teacher@example.com";
+        LocalDateTime expiresAt = LocalDateTime.of(2026, 11, 18, 22, 0);
+        given(passwordRecoveryService.generateToken(email))
+                .willReturn(Optional.of(new GeneratedPasswordRecoveryTokenDTO("teacher-token", expiresAt, RolUsuario.ROLE_PROFESOR)));
+
+        mockMvc.perform(post("/auth/password/forgot")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"teacher@example.com\"}"))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.message").value(GENERIC_MESSAGE));
+
+        ArgumentCaptor<URI> linkCaptor = ArgumentCaptor.forClass(URI.class);
+        verify(linkDelivery).deliver(eq(email), linkCaptor.capture(), eq(expiresAt));
+        assertThat(linkCaptor.getValue()).hasToString("http://localhost:5173/restablecer-contrasena?token=teacher-token");
+    }
+
+    @Test
+    void shouldReturnSameAcceptedResponseWhenNoTokenIsIssued() throws Exception {
+        given(passwordRecoveryService.generateToken("missing@example.com")).willReturn(Optional.empty());
 
         mockMvc.perform(post("/auth/password/forgot")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -101,28 +121,13 @@ class AuthPasswordRecoveryControllerTest {
     }
 
     @Test
-    void shouldReturnSameAcceptedResponseWhenEmailBelongsToAnotherRole() throws Exception {
-        given(passwordRecoveryService.generateTokenForStudent("teacher@example.com"))
-                .willThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, "Recuperación disponible solo para alumnos"));
-
-        mockMvc.perform(post("/auth/password/forgot")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"teacher@example.com\"}"))
-                .andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.message").value(GENERIC_MESSAGE));
-
-        verify(linkDelivery, never()).deliver(eq("teacher@example.com"),
-                org.mockito.ArgumentMatchers.any(URI.class), org.mockito.ArgumentMatchers.any());
-    }
-
-    @Test
     void shouldRejectMalformedEmailBeforeCallingRecoveryService() throws Exception {
         mockMvc.perform(post("/auth/password/forgot")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"not-an-email\"}"))
                 .andExpect(status().isBadRequest());
 
-        verify(passwordRecoveryService, never()).generateTokenForStudent("not-an-email");
+        verify(passwordRecoveryService, never()).generateToken("not-an-email");
     }
 
     @Test

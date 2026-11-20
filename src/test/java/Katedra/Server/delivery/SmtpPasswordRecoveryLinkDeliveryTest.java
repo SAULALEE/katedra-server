@@ -1,4 +1,4 @@
-package Katedra.Server.student.delivery;
+package Katedra.Server.delivery;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.mail.SimpleMailMessage;

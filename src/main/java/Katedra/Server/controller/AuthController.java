@@ -1,25 +1,23 @@
 package Katedra.Server.controller;
 
 import Katedra.Server.dto.AuthLoginRequestDTO;
+import Katedra.Server.model.RolUsuario;
 import Katedra.Server.dto.AuthRegisterRequestDTO;
 import Katedra.Server.dto.AuthResponseDTO;
 import Katedra.Server.dto.PasswordRecoveryAcceptedResponseDTO;
 import Katedra.Server.dto.PasswordRecoveryRequestDTO;
 import Katedra.Server.dto.PasswordResetRequestDTO;
 import Katedra.Server.service.AuthService;
-import Katedra.Server.student.dto.GeneratedPasswordRecoveryTokenDTO;
-import Katedra.Server.student.delivery.PasswordRecoveryLinkDelivery;
+import Katedra.Server.delivery.PasswordRecoveryLinkDelivery;
 import Katedra.Server.student.service.StudentSessionRevocationService;
-import Katedra.Server.student.service.PasswordRecoveryService;
+import Katedra.Server.service.PasswordRecoveryService;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
@@ -38,7 +36,10 @@ public class AuthController {
     private final PasswordRecoveryService passwordRecoveryService;
     private final PasswordRecoveryLinkDelivery passwordRecoveryLinkDelivery;
     private final StudentSessionRevocationService studentSessionRevocationService;
-    private final String passwordRecoveryPageUrl;
+    private static final String TEACHER_RESET_PATH = "/restablecer-contrasena";
+    private static final String STUDENT_RESET_PATH = "/alumnos/restablecer-contrasena";
+
+    private final String frontendBaseUrl;
     private final Validator validator;
 
     public AuthController(
@@ -46,15 +47,15 @@ public class AuthController {
             PasswordRecoveryService passwordRecoveryService,
             PasswordRecoveryLinkDelivery passwordRecoveryLinkDelivery,
             StudentSessionRevocationService studentSessionRevocationService,
-            @Value("${app.frontend.password-recovery-url:http://localhost:5173/reset-password}")
-            String passwordRecoveryPageUrl,
+            @Value("${app.frontend.base-url:http://localhost:5173}")
+            String frontendBaseUrl,
             Validator validator
     ) {
         this.authService = authService;
         this.passwordRecoveryService = passwordRecoveryService;
         this.passwordRecoveryLinkDelivery = passwordRecoveryLinkDelivery;
         this.studentSessionRevocationService = studentSessionRevocationService;
-        this.passwordRecoveryPageUrl = passwordRecoveryPageUrl;
+        this.frontendBaseUrl = frontendBaseUrl;
         this.validator = validator;
     }
 
@@ -89,9 +90,10 @@ public class AuthController {
     public ResponseEntity<PasswordRecoveryAcceptedResponseDTO> forgotPassword(
             @Valid @RequestBody PasswordRecoveryRequestDTO request
     ) {
-        try {
-            GeneratedPasswordRecoveryTokenDTO generated = passwordRecoveryService.generateTokenForStudent(request.email());
-            URI recoveryLink = UriComponentsBuilder.fromUriString(passwordRecoveryPageUrl)
+        passwordRecoveryService.generateToken(request.email()).ifPresent(generated -> {
+            String resetPath = generated.rol() == RolUsuario.ROLE_ALUMNO ? STUDENT_RESET_PATH : TEACHER_RESET_PATH;
+            URI recoveryLink = UriComponentsBuilder.fromUriString(frontendBaseUrl)
+                    .path(resetPath)
                     .queryParam("token", generated.token())
                     .build()
                     .encode()
@@ -101,15 +103,10 @@ public class AuthController {
             } catch (RuntimeException ignored) {
                 // Do not log delivery exceptions: they may contain the recovery link.
             }
-        } catch (ResponseStatusException exception) {
-            HttpStatus status = HttpStatus.valueOf(exception.getStatusCode().value());
-            if (status != HttpStatus.NOT_FOUND && status != HttpStatus.FORBIDDEN) {
-                throw exception;
-            }
-        }
+        });
 
         return ResponseEntity.accepted().body(new PasswordRecoveryAcceptedResponseDTO(
-                "Si existe una cuenta de alumno asociada a este correo, recibirás instrucciones para recuperar tu contraseña."
+                "Si existe una cuenta asociada a este correo, recibirás instrucciones para recuperar tu contraseña."
         ));
     }
 
