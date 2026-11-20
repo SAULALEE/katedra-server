@@ -18,8 +18,10 @@ Spanish version: [README.md](README.md) · Frontend: [katedra-client](https://gi
 - **API:** https://katedra-server.onrender.com/api/v1
 
 > **Demo credentials:** not published yet — see [Demo accounts](#demo-accounts) below.
-> The API is hosted on Render's free tier, so the first request after a period of
-> inactivity can take up to a minute to wake it up.
+> The API is hosted on Render's free tier, which suspends the service after a few minutes
+> without traffic. An external cron pings `/api/v1/health` every 10 minutes to keep it
+> awake, so the demo answers right away; should that ping fail, the first request can
+> take up to a minute to bring the service back up.
 
 ### Demo accounts
 

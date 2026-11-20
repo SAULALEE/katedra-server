@@ -69,6 +69,10 @@ public class WebSecurityConfig {
                 .requestMatchers("/auth/**", "/api/v1/auth/**").permitAll()
                 .requestMatchers("/oauth2/**", "/login/oauth2/**").permitAll()
                 .requestMatchers("/error").permitAll()
+                // Liveness probe. Public by necessity: the external cron that keeps the
+                // free-tier instance awake carries no credentials. Exposes only whether
+                // the app and its database are reachable, never any data.
+                .requestMatchers(HttpMethod.GET, "/health", "/api/v1/health").permitAll()
                 // springdoc-generated spec + Swagger UI. Read-only documentation of the API
                 // surface, not the surface itself — safe to expose without auth.
                 .requestMatchers(

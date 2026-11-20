@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main, staging]
 
+# Deploys are serialized rather than cancelled: interrupting a Render build mid-flight
+# leaves the service on the previous image with no clear signal why.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test:
     name: Build and test
@@ -28,3 +34,17 @@ jobs:
 
       - name: Verify the application packages
         run: ./mvnw -B -DskipTests package
+
+  # Render's own Auto-Deploy is switched off so that this job is the only path to production:
+  # `needs: test` means a commit that fails the suite never reaches the live service. Pinning
+  # ?ref to the tested SHA keeps a push that lands mid-build from deploying untested code.
+  deploy:
+    name: Deploy to Render
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render deploy
+        # The hook URL already carries ?key=..., hence the & rather than ?.
+        run: curl -fsS "${{ secrets.RENDER_DEPLOY_HOOK_URL }}&ref=${{ github.sha }}"

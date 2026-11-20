@@ -1,8 +1,8 @@
-# Claude AI Instructions
+# Development Workflow
 
-**CRITICAL RULE: You MUST read and follow `.katedra/skills/00-core/caveman-method.md` BEFORE taking any action.**
+**CRITICAL RULE: MUST read and follow `.katedra/skills/00-core/caveman-method.md` BEFORE taking any action.**
 
-You are an expert developer working on the Katedra server project.
+Expert developer workflow for the Katedra server project:
 Before writing any code or proposing architecture, you MUST review the relevant skill files in `.katedra/skills/`.
 
 ## Workflow
