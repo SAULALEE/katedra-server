@@ -45,6 +45,9 @@ class ExportacionControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
+    private Katedra.Server.student.service.StudentSessionRevocationService studentSessionRevocationService;
+
+    @MockitoBean
     private ExportacionMaterialService exportacionMaterialService;
 
     @MockitoBean

@@ -31,6 +31,9 @@ class PlanPublicoControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
+    private Katedra.Server.student.service.StudentSessionRevocationService studentSessionRevocationService;
+
+    @MockitoBean
     private PlanPublicoService planPublicoService;
 
     @MockitoBean

@@ -32,6 +32,9 @@ class HealthControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
+    private Katedra.Server.student.service.StudentSessionRevocationService studentSessionRevocationService;
+
+    @MockitoBean
     private DataSource dataSource;
 
     @MockitoBean

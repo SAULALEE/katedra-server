@@ -38,6 +38,9 @@ class StripeWebhookControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
+    private Katedra.Server.student.service.StudentSessionRevocationService studentSessionRevocationService;
+
+    @MockitoBean
     private SuscripcionService suscripcionService;
 
     @MockitoBean

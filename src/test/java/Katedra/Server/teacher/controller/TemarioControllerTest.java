@@ -48,6 +48,9 @@ class TemarioControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
+    private Katedra.Server.student.service.StudentSessionRevocationService studentSessionRevocationService;
+
+    @MockitoBean
     private TemarioService temarioService;
 
     @MockitoBean

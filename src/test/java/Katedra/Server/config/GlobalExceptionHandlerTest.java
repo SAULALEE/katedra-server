@@ -35,6 +35,9 @@ class GlobalExceptionHandlerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
+    private Katedra.Server.student.service.StudentSessionRevocationService studentSessionRevocationService;
+
+    @MockitoBean
     private UsuarioService usuarioService;
 
     @MockitoBean
