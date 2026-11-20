@@ -9,6 +9,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -70,6 +74,20 @@ public class JwtService {
 
     public Date extractExpirationDate(String token) {
         return extractExpiration(token);
+    }
+
+    /**
+     * True when the token was issued before the given UTC instant. JWT iat has second
+     * precision, so the instant is truncated to seconds: a token issued in the same second
+     * as a password reset (e.g. the login right after it) stays valid.
+     */
+    public boolean isIssuedBefore(String token, LocalDateTime utcInstant) {
+        Date issuedAt = extractAllClaims(token).getIssuedAt();
+        if (issuedAt == null) {
+            return true;
+        }
+        Instant threshold = utcInstant.truncatedTo(ChronoUnit.SECONDS).toInstant(ZoneOffset.UTC);
+        return issuedAt.toInstant().isBefore(threshold);
     }
 
     private String buildToken(Map<String, Object> extraClaims, Usuario usuario, long expiration) {

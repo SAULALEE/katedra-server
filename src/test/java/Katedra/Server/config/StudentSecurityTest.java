@@ -111,4 +111,30 @@ class StudentSecurityTest {
         mockMvc.perform(get("/students/me").header("Authorization", "Bearer " + expiredToken))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void shouldRejectJwtIssuedBeforePasswordReset() throws Exception {
+        Usuario student = new Usuario(
+                "student@example.com", "hash", "Student", RolUsuario.ROLE_ALUMNO);
+        ReflectionTestUtils.setField(student, "id", "student-id");
+        given(usuarioRepository.findByEmail(student.getEmail())).willReturn(Optional.of(student));
+        String oldToken = jwtService.generateToken(student);
+        student.setPasswordChangedAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).plusSeconds(5));
+
+        mockMvc.perform(get("/students/me").header("Authorization", "Bearer " + oldToken))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldAcceptJwtIssuedAfterPasswordReset() throws Exception {
+        Usuario student = new Usuario(
+                "student@example.com", "hash", "Student", RolUsuario.ROLE_ALUMNO);
+        ReflectionTestUtils.setField(student, "id", "student-id");
+        student.setPasswordChangedAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).minusSeconds(5));
+        given(usuarioRepository.findByEmail(student.getEmail())).willReturn(Optional.of(student));
+        String newToken = jwtService.generateToken(student);
+
+        mockMvc.perform(get("/students/me").header("Authorization", "Bearer " + newToken))
+                .andExpect(status().isOk());
+    }
 }
